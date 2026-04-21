@@ -3,22 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Grid Arena (WebSocket)</title>
+    <title>Co-op Pixel Board</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <main class="layout">
       <section class="left">
-        <h1>Grid Arena</h1>
-        <p class="subtitle">Move with arrow keys. Tag other players to gain points.</p>
+        <h1>Co-op Pixel Board</h1>
+        <p class="subtitle">Everyone paints the same board in real time.</p>
         <div class="panel">
           <label for="nameInput">Display Name</label>
           <div class="row">
             <input id="nameInput" type="text" maxlength="20" value="Student" />
             <button id="setNameBtn">Update</button>
           </div>
+          <label for="colorInput">Brush Color</label>
+          <div class="row">
+            <input id="colorInput" type="color" value="#22c55e" />
+            <button id="clearBtn">Clear Board</button>
+          </div>
           <p id="statusText">Status: connecting...</p>
-          <p id="playersText">Players: 0</p>
+          <p id="playersText">Artists online: 0</p>
         </div>
 
         <div class="panel">
@@ -34,8 +39,8 @@
       <section class="right">
         <div id="board" class="board"></div>
         <div class="legend">
-          <h3>Scoreboard</h3>
-          <ul id="scoreList"></ul>
+          <h3>Artists Online</h3>
+          <ul id="userList"></ul>
         </div>
       </section>
     </main>
