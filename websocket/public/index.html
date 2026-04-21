@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Collab canvas</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <div class="brand">
+        <span class="dot" aria-hidden="true"></span>
+        <h1>Collab canvas</h1>
+      </div>
+      <p class="hint">Open this page in two windows — draw together in real time.</p>
+      <div class="status" id="status">Connecting…</div>
+    </header>
+
+    <main class="layout">
+      <aside class="panel">
+        <label class="field">
+          <span>Your name</span>
+          <input id="name" type="text" maxlength="24" placeholder="e.g. Alex" autocomplete="nickname" />
+        </label>
+        <button type="button" id="saveName" class="btn primary">Save name</button>
+        <p class="you" id="youLabel"></p>
+        <hr />
+        <button type="button" id="clear" class="btn danger">Clear canvas for everyone</button>
+        <p class="small muted">Clears the shared board for all connected clients.</p>
+        <hr />
+        <h2>Connected</h2>
+        <ul id="peerList" class="peer-list"></ul>
+      </aside>
+      <div class="canvas-wrap">
+        <canvas id="board" width="1200" height="800" aria-label="Shared drawing canvas"></canvas>
+        <div id="cursors" class="cursors" aria-hidden="true"></div>
+      </div>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
