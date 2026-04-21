@@ -1,67 +1,132 @@
 /* style.css
    This file contains simple styling for the page and canvas. */
 
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
-  font-family: Arial, sans-serif;
-  background: #f4f6f8;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: #1f2937;
+  background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 45%, #ffffff 100%);
 }
 
 .container {
-  max-width: 960px;
-  margin: 24px auto;
-  padding: 16px;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.hero {
+  padding: 34px 0 18px;
   text-align: center;
 }
 
-h1 {
-  margin-bottom: 8px;
+.hero h1 {
+  margin: 0 0 8px;
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
 }
 
-p {
-  margin-top: 0;
-  color: #444;
+.subtitle {
+  margin: 0 auto;
+  max-width: 680px;
+  color: #4b5563;
+}
+
+main.container {
+  padding-bottom: 20px;
+}
+
+.card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.controls {
+  margin-bottom: 14px;
+  padding: 14px 16px;
 }
 
 .toolbar {
   display: flex;
-  justify-content: center;
   align-items: center;
-  gap: 12px;
   flex-wrap: wrap;
-  margin: 12px 0;
+  justify-content: space-between;
+  gap: 10px 14px;
 }
 
 .info {
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  border-radius: 999px;
+  padding: 6px 10px;
   font-size: 14px;
-  color: #333;
+}
+
+.brush-label {
+  font-size: 14px;
+  color: #374151;
 }
 
 #brushSize {
-  vertical-align: middle;
+  width: 170px;
+  accent-color: #2563eb;
 }
 
 #clearBtn {
-  margin: 12px 0;
-  padding: 10px 16px;
+  margin: 0;
+  padding: 10px 14px;
   border: none;
   border-radius: 6px;
-  background: #e74c3c;
+  background: #dc2626;
   color: #fff;
-  font-size: 15px;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
+  transition: 0.2s ease;
 }
 
 #clearBtn:hover {
-  background: #c0392b;
+  background: #b91c1c;
+  transform: translateY(-1px);
+}
+
+.canvas-card {
+  padding: 14px;
 }
 
 #canvas {
   display: block;
   margin: 0 auto;
-  border: 2px solid #333;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
   background: #fff;
   cursor: crosshair;
+}
+
+.site-footer {
+  margin: 22px 0 28px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+@media (max-width: 700px) {
+  .toolbar {
+    justify-content: center;
+  }
 }
