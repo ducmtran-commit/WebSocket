@@ -53,6 +53,25 @@ body {
   gap: 8px;
 }
 
+.color-history {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 6px 0 10px;
+}
+
+.color-swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid #334155;
+  border-radius: 6px;
+}
+
+.color-swatch.active {
+  border-color: #e2e8f0;
+}
+
 input,
 button {
   border-radius: 8px;
