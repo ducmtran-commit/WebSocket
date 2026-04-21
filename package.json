@@ -1,0 +1,22 @@
+{
+  "name": "collaborative-canvas",
+  "version": "1.0.0",
+  "description": "A beginner-friendly real-time collaborative drawing board using Node.js, Express, and WebSocket (ws).",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "websocket",
+    "collaboration",
+    "canvas",
+    "nodejs",
+    "express"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  }
+}
