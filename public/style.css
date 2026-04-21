@@ -91,6 +91,14 @@ input {
   width: max-content;
 }
 
+.nav-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #cbd5e1;
+  font-size: 0.9rem;
+}
+
 .board-viewport {
   overflow: auto;
   max-height: 78vh;
