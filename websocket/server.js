@@ -9,11 +9,19 @@ const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
 const PORT = process.env.PORT || 3000;
+const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "*";
+
+const io = new Server(server, {
+  cors: {
+    origin: CLIENT_ORIGIN === "*" ? true : CLIENT_ORIGIN,
+    methods: ["GET", "POST"],
+  },
+});
 
 // Serve the frontend files from the public folder.
 app.use(express.static(path.join(__dirname, "public")));
+app.get("/health", (_req, res) => res.status(200).send("ok"));
 
 // Keep all line segments in memory so new users can see existing drawing.
 const strokes = [];
@@ -81,5 +89,6 @@ io.on("connection", (socket) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Socket.IO CORS origin: ${CLIENT_ORIGIN}`);
 });
