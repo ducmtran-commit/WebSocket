@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: collaborative-canvas
+    name: coop-pixel-board
     env: node
     plan: free
     buildCommand: npm install
