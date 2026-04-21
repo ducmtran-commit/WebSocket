@@ -108,6 +108,8 @@ wss.on("connection", (ws) => {
 
   state.users.set(userId, user);
   ws.userId = userId;
+  ws.undoStack = [];
+  ws.redoStack = [];
 
   addChat("System", `${user.name} joined the board.`);
   sendInitState(ws);
@@ -137,6 +139,7 @@ wss.on("connection", (ws) => {
     if (msg.type === "paint-batch") {
       if (!Array.isArray(msg.pixels) || msg.pixels.length === 0) return;
       const seen = new Set();
+      const changes = [];
       for (const item of msg.pixels) {
         const x = Number(item?.x);
         const y = Number(item?.y);
@@ -147,14 +150,48 @@ wss.on("connection", (ws) => {
         const key = `${x},${y}`;
         if (seen.has(key)) continue;
         seen.add(key);
+        const prevColor = state.pixels[y][x];
+        if (prevColor === color) continue;
+        changes.push({ x, y, from: prevColor, to: color });
         state.pixels[y][x] = color;
         broadcastPixelUpdate(x, y, color);
       }
+      if (changes.length > 0) {
+        ws.undoStack.push({ changes });
+        if (ws.undoStack.length > 80) ws.undoStack.shift();
+        ws.redoStack = [];
+      }
+      return;
+    }
+
+    if (msg.type === "undo") {
+      const action = ws.undoStack.pop();
+      if (!action) return;
+      for (const change of action.changes) {
+        state.pixels[change.y][change.x] = change.from;
+        broadcastPixelUpdate(change.x, change.y, change.from);
+      }
+      ws.redoStack.push(action);
+      if (ws.redoStack.length > 80) ws.redoStack.shift();
+      return;
+    }
+
+    if (msg.type === "redo") {
+      const action = ws.redoStack.pop();
+      if (!action) return;
+      for (const change of action.changes) {
+        state.pixels[change.y][change.x] = change.to;
+        broadcastPixelUpdate(change.x, change.y, change.to);
+      }
+      ws.undoStack.push(action);
+      if (ws.undoStack.length > 80) ws.undoStack.shift();
       return;
     }
 
     if (msg.type === "clear-board") {
       state.pixels = Array.from({ length: GRID_HEIGHT }, () => Array(GRID_WIDTH).fill(DEFAULT_PIXEL));
+      ws.undoStack = [];
+      ws.redoStack = [];
       addChat("System", `${current.name} cleared the board.`);
       broadcastBoardCleared();
       broadcastChat();
