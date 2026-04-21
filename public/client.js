@@ -2,7 +2,9 @@ const board = document.getElementById("board");
 const nameInput = document.getElementById("nameInput");
 const setNameBtn = document.getElementById("setNameBtn");
 const colorInput = document.getElementById("colorInput");
+const eraserBtn = document.getElementById("eraserBtn");
 const clearBtn = document.getElementById("clearBtn");
+const toolText = document.getElementById("toolText");
 const statusText = document.getElementById("statusText");
 const playersText = document.getElementById("playersText");
 const userList = document.getElementById("userList");
@@ -15,6 +17,8 @@ let reconnectAttempts = 0;
 let reconnectTimer = null;
 let latestState = { gridWidth: 32, gridHeight: 24, pixels: [], users: [], chat: [] };
 let isPainting = false;
+let isErasing = false;
+const ERASE_COLOR = "#0b1220";
 
 function wsUrl() {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -113,7 +117,8 @@ function paintCellFromEvent(event) {
   const x = Number(target.dataset.x);
   const y = Number(target.dataset.y);
   if (!Number.isInteger(x) || !Number.isInteger(y)) return;
-  send({ type: "paint", x, y, color: colorInput.value });
+  const color = isErasing ? ERASE_COLOR : colorInput.value;
+  send({ type: "paint", x, y, color });
 }
 
 board.addEventListener("mousedown", (event) => {
@@ -132,6 +137,12 @@ window.addEventListener("mouseup", () => {
 
 setNameBtn.addEventListener("click", () => {
   send({ type: "set-name", name: nameInput.value.trim() || "Student" });
+});
+
+eraserBtn.addEventListener("click", () => {
+  isErasing = !isErasing;
+  eraserBtn.textContent = `Eraser: ${isErasing ? "On" : "Off"}`;
+  toolText.textContent = `Tool: ${isErasing ? "Eraser" : "Brush"}`;
 });
 
 clearBtn.addEventListener("click", () => {
