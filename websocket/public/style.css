@@ -1,0 +1,47 @@
+/* style.css
+   This file contains simple styling for the page and canvas. */
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f4f6f8;
+}
+
+.container {
+  max-width: 960px;
+  margin: 24px auto;
+  padding: 16px;
+  text-align: center;
+}
+
+h1 {
+  margin-bottom: 8px;
+}
+
+p {
+  margin-top: 0;
+  color: #444;
+}
+
+#clearBtn {
+  margin: 12px 0;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  background: #e74c3c;
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+#clearBtn:hover {
+  background: #c0392b;
+}
+
+#canvas {
+  display: block;
+  margin: 0 auto;
+  border: 2px solid #333;
+  background: #fff;
+  cursor: crosshair;
+}
