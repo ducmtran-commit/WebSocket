@@ -3,62 +3,42 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Collaborative Canvas</title>
+    <title>Grid Arena (WebSocket)</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <header class="hero">
-      <div class="container">
-        <h1>Collaborative Canvas</h1>
-        <p class="subtitle">
-          Draw together in real time. Each mark contributes to a shared visual conversation.
-        </p>
-        <p class="concept" id="conceptParagraph">
-          Concept: Collaborative Canvas treats drawing as a social space. Instead of a private
-          sketchbook, the canvas becomes a live public surface where many people shape one image
-          together.
-        </p>
-      </div>
-    </header>
-
-    <main class="container">
-      <section class="panel">
-        <div class="row">
-          <label class="field">
-            <span>Room</span>
-            <input id="roomInput" type="text" value="main" maxlength="30" />
-          </label>
-          <label class="field">
-            <span>Name</span>
-            <input id="nameInput" type="text" value="Student" maxlength="24" />
-          </label>
-          <button id="joinBtn" class="btn secondary">Join Room</button>
+    <main class="layout">
+      <section class="left">
+        <h1>Grid Arena</h1>
+        <p class="subtitle">Move with arrow keys. Tag other players to gain points.</p>
+        <div class="panel">
+          <label for="nameInput">Display Name</label>
+          <div class="row">
+            <input id="nameInput" type="text" maxlength="20" value="Student" />
+            <button id="setNameBtn">Update</button>
+          </div>
+          <p id="statusText">Status: connecting...</p>
+          <p id="playersText">Players: 0</p>
         </div>
 
-        <div class="row">
-          <label class="field inline">
-            <span>Color</span>
-            <input id="colorInput" type="color" value="#1f2937" />
-          </label>
-          <label class="field inline grow">
-            <span>Brush Size: <strong id="sizeValue">4</strong></span>
-            <input id="sizeInput" type="range" min="1" max="24" value="4" />
-          </label>
-          <button id="clearBtn" class="btn danger">Clear Canvas</button>
-        </div>
-
-        <div class="stats">
-          <span id="statusBadge">Status: connecting...</span>
-          <span id="roomBadge">Room: main</span>
-          <span id="countBadge">Users: 0</span>
+        <div class="panel">
+          <h2>Chat</h2>
+          <div id="chatBox" class="chat-box"></div>
+          <div class="row">
+            <input id="chatInput" type="text" maxlength="120" placeholder="Say something..." />
+            <button id="sendChatBtn">Send</button>
+          </div>
         </div>
       </section>
 
-      <section class="canvas-card">
-        <canvas id="board" width="1200" height="700"></canvas>
+      <section class="right">
+        <div id="board" class="board"></div>
+        <div class="legend">
+          <h3>Scoreboard</h3>
+          <ul id="scoreList"></ul>
+        </div>
       </section>
     </main>
-
     <script src="client.js"></script>
   </body>
 </html>
