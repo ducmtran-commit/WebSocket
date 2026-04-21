@@ -99,6 +99,10 @@ input {
   font-size: 0.9rem;
 }
 
+.nav-range {
+  flex: 1;
+}
+
 .board-viewport {
   overflow: auto;
   max-height: 78vh;
