@@ -157,9 +157,27 @@ function setZoom(nextZoom) {
 
 function renderChat(chat) {
   chatBox.innerHTML = "";
+  const colorByName = new Map(
+    (latestState.users || []).map((user) => [String(user.name || ""), String(user.color || "#e2e8f0")])
+  );
   chat.forEach((entry) => {
     const line = document.createElement("div");
-    line.textContent = `${entry.author}: ${entry.text}`;
+    line.className = "chat-line";
+
+    const author = document.createElement("span");
+    author.className = "chat-author";
+    author.textContent = `${entry.author}:`;
+    const authorColor = colorByName.get(String(entry.author || ""));
+    if (authorColor) {
+      author.style.color = authorColor;
+    }
+
+    const message = document.createElement("span");
+    message.className = "chat-message";
+    message.textContent = ` ${entry.text}`;
+
+    line.appendChild(author);
+    line.appendChild(message);
     chatBox.appendChild(line);
   });
   chatBox.scrollTop = chatBox.scrollHeight;
