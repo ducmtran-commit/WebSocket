@@ -24,10 +24,10 @@ io.on("connection", (socket) => {
   // Send existing drawing history to the newly connected client only.
   socket.emit("load-canvas", strokes);
 
-  // Receive a new line segment and broadcast it to everyone.
+  // Receive a new line segment and broadcast it to other users.
   socket.on("draw", (line) => {
     strokes.push(line);
-    io.emit("draw", line);
+    socket.broadcast.emit("draw", line);
   });
 
   // Clear shared history and tell all clients to clear their canvas.
