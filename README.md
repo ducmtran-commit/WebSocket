@@ -1,108 +1,43 @@
-# Collaborative Canvas
+# Grid Arena (WebSocket Class Project)
 
-Collaborative Canvas is a real-time shared drawing board built for a class project. Multiple users can connect to the same room and draw together on one canvas. Every brush movement is sent through WebSockets, so marks appear instantly for everyone.
+Grid Arena is a real-time multiplayer interaction app. Multiple users join the same board, move with arrow keys, tag each other for points, and chat live. Every interaction is synchronized through WebSockets.
 
-## Concept Paragraph (for assignment)
+## Why This Fits The Assignment
 
-Collaborative Canvas explores drawing as a social activity instead of an individual one. A stroke is not only a personal gesture but also a shared event witnessed by others in real time. By turning a canvas into a live public surface, the project frames mark-making as collaboration, negotiation, and collective authorship.
+- Uses a Node.js server (`server.js`)
+- Uses WebSockets (`ws`) for real-time communication
+- Two or more clients can connect and interact on shared state
+- Ready to deploy to Render as one web service
 
-## Tech Stack
+## Interaction Design
 
-- Node.js
-- Express
-- WebSocket with `ws`
-- PostgreSQL (optional persistence with `DATABASE_URL`)
-- Plain HTML/CSS/JavaScript
+Each connected user is represented by a colored square on a shared 14x14 grid.
 
-## Project Structure
+- Press arrow keys to move
+- When you move onto another player tile, you tag them and earn a point
+- Chat updates in real time for all players
+- Scoreboard updates live for everyone
 
-```text
-.
-├─ public/
-│  ├─ index.html
-│  ├─ style.css
-│  └─ client.js
-├─ server.js
-├─ package.json
-├─ .gitignore
-├─ render.yaml
-└─ README.md
-```
-
-## Setup
-
-1. Install Node.js (18+ recommended).
-2. Open terminal in this project folder.
-3. Run:
-   - `npm install`
+This makes the shared interaction obvious and easy to demo in class with two browser windows.
 
 ## Run Locally
 
-1. Start the app:
-   - `npm start`
-2. Open:
-   - `http://localhost:3000`
-3. Open a second tab (or another browser) to test collaboration.
+```bash
+npm install
+npm start
+```
 
-## Deployment on Render
+Open `http://localhost:3000` in two tabs/windows to test multi-user interaction.
 
-### Option A: Using `render.yaml` (recommended)
+## Deploy On Render
 
-1. Push this repository to GitHub.
-2. In Render, click **New +** -> **Blueprint**.
-3. Select your GitHub repository.
-4. Render reads `render.yaml` automatically.
-5. Deploy and open your live URL.
-
-### Option B: Manual Web Service setup
-
-1. In Render, click **New +** -> **Web Service**.
-2. Connect your GitHub repository.
-3. Use:
+1. Push this project to GitHub
+2. Create a new **Web Service** on Render
+3. Set commands:
    - Build Command: `npm install`
    - Start Command: `npm start`
-4. Add optional environment variables:
-   - `NODE_ENV=production`
-   - `DATABASE_URL=...` (Render Postgres internal URL, if you want persistent rooms)
-5. Deploy.
+4. Deploy and open the generated Render URL
 
-## Optional Persistent Storage (like larger collaboration demos)
+## Suggested Submission Text
 
-By default, the app stores room strokes in memory.  
-If you set `DATABASE_URL`, the server automatically:
-
-- creates a `canvas_rooms` table
-- loads room strokes from Postgres on join
-- batches stroke saves to Postgres while users draw
-- keeps room state after server restarts
-
-## Add Final Links Before Submission
-
-- GitHub Repository URL: `PASTE_YOUR_GITHUB_REPO_URL_HERE`
-- Live Deployment URL: `PASTE_YOUR_RENDER_LIVE_URL_HERE`
-
-## Assignment Checklist Mapping
-
-- Uses WebSockets: yes (`ws`)
-- Includes Node.js server: yes (`server.js`)
-- Multiple clients share interaction live: yes (room broadcast)
-- Deployable as live site: yes (Render instructions/config included)
-- Concept paragraph included: yes (see above)
-- Ready for repo link + live link submission: yes (placeholders included)
-
-## Sample GitHub Repo Description
-
-Collaborative Canvas is a beginner-friendly Node.js + WebSocket class project where multiple users draw together in real time on a shared online canvas.
-
-## Sample Submission Text (for class)
-
-I built Collaborative Canvas, a real-time multi-user drawing board using Node.js, Express, and the `ws` WebSocket library. The server broadcasts drawing events (`draw-start`, `draw-move`, `draw-end`, and `clear-canvas`) so all connected clients see the same interaction instantly. The app includes color and brush controls, user count, room support, and reconnect-safe client behavior. It is deployed as a live web app on Render.
-
-## Critique Slide Text
-
-**Project Title:** Collaborative Canvas  
-**Concept:** A shared canvas where drawing becomes a social interaction in real time.  
-**Tech Stack:** Node.js, Express, WebSocket (`ws`), HTML/CSS/JavaScript.  
-**Interaction Summary:** Users join a room, draw with color/brush controls, and see all marks instantly across clients.  
-**GitHub Link:** `PASTE_GITHUB_LINK_HERE`  
-**Live Site Link:** `PASTE_LIVE_SITE_LINK_HERE`
+I built Grid Arena using Node.js, Express, and the `ws` WebSocket library. The server keeps a shared multiplayer state and broadcasts updates so all connected clients see movement, chat, and score changes instantly. The app demonstrates real-time multi-user interaction by letting players move on the same grid and tag each other for points.
