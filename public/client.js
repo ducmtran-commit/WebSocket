@@ -1,9 +1,11 @@
 const board = document.getElementById("board");
 const nameInput = document.getElementById("nameInput");
 const setNameBtn = document.getElementById("setNameBtn");
+const colorInput = document.getElementById("colorInput");
+const clearBtn = document.getElementById("clearBtn");
 const statusText = document.getElementById("statusText");
 const playersText = document.getElementById("playersText");
-const scoreList = document.getElementById("scoreList");
+const userList = document.getElementById("userList");
 const chatBox = document.getElementById("chatBox");
 const chatInput = document.getElementById("chatInput");
 const sendChatBtn = document.getElementById("sendChatBtn");
@@ -11,7 +13,8 @@ const sendChatBtn = document.getElementById("sendChatBtn");
 let ws;
 let reconnectAttempts = 0;
 let reconnectTimer = null;
-let latestState = { gridSize: 14, players: [], chat: [] };
+let latestState = { gridWidth: 32, gridHeight: 24, pixels: [], users: [], chat: [] };
+let isPainting = false;
 
 function wsUrl() {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -26,23 +29,15 @@ function send(payload) {
 
 function renderBoard(state) {
   board.innerHTML = "";
-  board.style.gridTemplateColumns = `repeat(${state.gridSize}, 1fr)`;
+  board.style.gridTemplateColumns = `repeat(${state.gridWidth}, 1fr)`;
 
-  const playerByCell = new Map();
-  for (const player of state.players) {
-    playerByCell.set(`${player.x},${player.y}`, player);
-  }
-
-  for (let y = 0; y < state.gridSize; y += 1) {
-    for (let x = 0; x < state.gridSize; x += 1) {
+  for (let y = 0; y < state.gridHeight; y += 1) {
+    for (let x = 0; x < state.gridWidth; x += 1) {
       const cell = document.createElement("div");
       cell.className = "cell";
-      const occupant = playerByCell.get(`${x},${y}`);
-      if (occupant) {
-        cell.classList.add("player");
-        cell.style.background = occupant.color;
-        cell.title = `${occupant.name} (${occupant.score})`;
-      }
+      cell.dataset.x = String(x);
+      cell.dataset.y = String(y);
+      cell.style.background = state.pixels?.[y]?.[x] || "#0b1220";
       board.appendChild(cell);
     }
   }
@@ -58,25 +53,22 @@ function renderChat(chat) {
   chatBox.scrollTop = chatBox.scrollHeight;
 }
 
-function renderScores(players) {
-  scoreList.innerHTML = "";
-  players
-    .slice()
-    .sort((a, b) => b.score - a.score)
-    .forEach((player) => {
+function renderUsers(users) {
+  userList.innerHTML = "";
+  users.forEach((player) => {
       const li = document.createElement("li");
-      li.textContent = `${player.name}: ${player.score}`;
+      li.textContent = player.name;
       li.style.color = player.color;
-      scoreList.appendChild(li);
+      userList.appendChild(li);
     });
 }
 
 function renderState(state) {
   latestState = state;
-  playersText.textContent = `Players: ${state.players.length}`;
+  playersText.textContent = `Artists online: ${state.users.length}`;
   renderBoard(state);
   renderChat(state.chat);
-  renderScores(state.players);
+  renderUsers(state.users);
 }
 
 function connect() {
@@ -114,21 +106,36 @@ function connect() {
   });
 }
 
-window.addEventListener("keydown", (event) => {
-  const moveMap = {
-    ArrowUp: { dx: 0, dy: -1 },
-    ArrowDown: { dx: 0, dy: 1 },
-    ArrowLeft: { dx: -1, dy: 0 },
-    ArrowRight: { dx: 1, dy: 0 },
-  };
-  const move = moveMap[event.key];
-  if (!move) return;
-  event.preventDefault();
-  send({ type: "move", ...move });
+function paintCellFromEvent(event) {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+  if (!target.classList.contains("cell")) return;
+  const x = Number(target.dataset.x);
+  const y = Number(target.dataset.y);
+  if (!Number.isInteger(x) || !Number.isInteger(y)) return;
+  send({ type: "paint", x, y, color: colorInput.value });
+}
+
+board.addEventListener("mousedown", (event) => {
+  isPainting = true;
+  paintCellFromEvent(event);
+});
+
+board.addEventListener("mouseover", (event) => {
+  if (!isPainting) return;
+  paintCellFromEvent(event);
+});
+
+window.addEventListener("mouseup", () => {
+  isPainting = false;
 });
 
 setNameBtn.addEventListener("click", () => {
   send({ type: "set-name", name: nameInput.value.trim() || "Student" });
+});
+
+clearBtn.addEventListener("click", () => {
+  send({ type: "clear-board" });
 });
 
 sendChatBtn.addEventListener("click", () => {
