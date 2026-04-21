@@ -23,6 +23,16 @@ Your frontend URL:
 The app will prompt once for your backend URL when opened on GitHub Pages.
 Paste your Render URL and it will be saved in browser localStorage.
 
+### Important GitHub Pages settings (to avoid 404)
+
+In your repository settings:
+1. Open **Settings -> Pages**
+2. Under **Build and deployment**, choose:
+   - **Source**: Deploy from a branch
+   - **Branch**: `main`
+   - **Folder**: `/docs`
+3. Save and wait 1-3 minutes for publish.
+
 ## 3) Update backend URL later
 
 If you redeploy and get a new URL:
