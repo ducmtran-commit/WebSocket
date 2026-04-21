@@ -1,248 +1,158 @@
-// server.js
-// Node + Express + ws server for the Collaborative Canvas class project.
-
 const http = require("http");
 const path = require("path");
 const express = require("express");
-const { WebSocketServer } = require("ws");
-const { Pool } = require("pg");
+const { WebSocketServer, WebSocket } = require("ws");
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
-
 const PORT = process.env.PORT || 3000;
-const DATABASE_URL = process.env.DATABASE_URL;
-const USE_DB = Boolean(DATABASE_URL);
-const pool = USE_DB
-  ? new Pool({
-      connectionString: DATABASE_URL,
-      ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
-    })
-  : null;
 
-// Serve frontend files from /public.
+const GRID_SIZE = 14;
+const SPAWN_POINTS = [
+  { x: 0, y: 0 },
+  { x: GRID_SIZE - 1, y: GRID_SIZE - 1 },
+  { x: 0, y: GRID_SIZE - 1 },
+  { x: GRID_SIZE - 1, y: 0 },
+];
+
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/health", (_req, res) => res.status(200).send("ok"));
 
-// Room state is kept in memory:
-// - strokes: full drawing history for that room
-// - clients: currently connected sockets in that room
-const rooms = new Map();
-const pendingSaveTimers = new Map();
+const state = {
+  players: new Map(),
+  chat: [],
+};
 
-function getOrCreateRoom(roomId) {
-  if (!rooms.has(roomId)) {
-    rooms.set(roomId, { strokes: [], clients: new Set() });
-  }
-  return rooms.get(roomId);
+function randomColor() {
+  const palette = ["#f97316", "#0ea5e9", "#22c55e", "#a855f7", "#ef4444", "#14b8a6", "#eab308"];
+  return palette[Math.floor(Math.random() * palette.length)];
 }
 
-async function ensureDbSchema() {
-  if (!USE_DB) return;
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS canvas_rooms (
-      room_id TEXT PRIMARY KEY,
-      strokes JSONB NOT NULL DEFAULT '[]'::jsonb,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
+function nextSpawn() {
+  const point = SPAWN_POINTS[state.players.size % SPAWN_POINTS.length];
+  return { ...point };
 }
 
-async function loadRoomStrokes(roomId) {
-  if (!USE_DB) return null;
-  const result = await pool.query("SELECT strokes FROM canvas_rooms WHERE room_id = $1", [roomId]);
-  if (result.rowCount === 0) return [];
-  return Array.isArray(result.rows[0].strokes) ? result.rows[0].strokes : [];
+function safeName(value) {
+  if (typeof value !== "string") return "Player";
+  const cleaned = value.trim().slice(0, 20);
+  return cleaned || "Player";
 }
 
-function scheduleRoomSave(roomId) {
-  if (!USE_DB) return;
-  if (pendingSaveTimers.has(roomId)) return;
-
-  // Batch writes so draw-move does not hit DB on every message.
-  const timer = setTimeout(async () => {
-    pendingSaveTimers.delete(roomId);
-    const room = rooms.get(roomId);
-    if (!room) return;
-    try {
-      await pool.query(
-        `
-        INSERT INTO canvas_rooms (room_id, strokes, updated_at)
-        VALUES ($1, $2::jsonb, NOW())
-        ON CONFLICT (room_id)
-        DO UPDATE SET strokes = EXCLUDED.strokes, updated_at = NOW()
-      `,
-        [roomId, JSON.stringify(room.strokes)]
-      );
-    } catch (error) {
-      console.error("Failed to persist room:", roomId, error.message);
-    }
-  }, 800);
-
-  pendingSaveTimers.set(roomId, timer);
+function serializePlayers() {
+  return Array.from(state.players.values()).map((player) => ({
+    id: player.id,
+    name: player.name,
+    color: player.color,
+    x: player.x,
+    y: player.y,
+    score: player.score,
+  }));
 }
 
-function broadcastToRoom(roomId, message, exceptClient = null) {
-  const room = rooms.get(roomId);
-  if (!room) return;
-
-  const payload = JSON.stringify(message);
-  for (const client of room.clients) {
-    if (client === exceptClient) continue;
-    if (client.readyState === 1) {
-      client.send(payload);
+function broadcast(payload) {
+  const message = JSON.stringify(payload);
+  for (const client of wss.clients) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
     }
   }
 }
 
-function sendUserCount(roomId) {
-  const room = rooms.get(roomId);
-  if (!room) return;
-  broadcastToRoom(roomId, {
-    type: "user-count",
-    count: room.clients.size,
-    roomId,
+function sendState() {
+  broadcast({
+    type: "state",
+    gridSize: GRID_SIZE,
+    players: serializePlayers(),
+    chat: state.chat,
   });
 }
 
-function parseJson(raw) {
-  try {
-    return JSON.parse(String(raw));
-  } catch {
-    return null;
-  }
+function addChat(author, text) {
+  state.chat.push({ author, text, at: Date.now() });
+  if (state.chat.length > 30) state.chat.shift();
 }
 
-wss.on("connection", async (ws) => {
-  // Set defaults until the client joins a room.
-  ws.roomId = "main";
-  ws.username = "Anonymous";
+wss.on("connection", (ws) => {
+  const playerId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const spawn = nextSpawn();
+  const player = {
+    id: playerId,
+    name: "Player",
+    color: randomColor(),
+    x: spawn.x,
+    y: spawn.y,
+    score: 0,
+  };
 
-  // Put user in default room immediately so first-time users can collaborate.
-  const room = getOrCreateRoom(ws.roomId);
-  room.clients.add(ws);
-  if (USE_DB && room.strokes.length === 0) {
+  state.players.set(playerId, player);
+  ws.playerId = playerId;
+
+  addChat("System", `${player.name} joined the arena.`);
+  sendState();
+
+  ws.on("message", (raw) => {
+    let msg;
     try {
-      room.strokes = await loadRoomStrokes(ws.roomId);
-    } catch (error) {
-      console.error("Failed loading main room from DB:", error.message);
+      msg = JSON.parse(String(raw));
+    } catch {
+      return;
     }
-  }
 
-  // Send existing room drawing state to just this new user.
-  ws.send(
-    JSON.stringify({
-      type: "init-state",
-      roomId: ws.roomId,
-      strokes: room.strokes,
-      count: room.clients.size,
-    })
-  );
-
-  sendUserCount(ws.roomId);
-
-  ws.on("message", async (raw) => {
-    const msg = parseJson(raw);
     if (!msg || typeof msg.type !== "string") return;
+    const current = state.players.get(ws.playerId);
+    if (!current) return;
 
-    // Optional room support:
-    // client can switch/create rooms with a room id and name.
-    if (msg.type === "join-room") {
-      const nextRoomId =
-        typeof msg.roomId === "string" && msg.roomId.trim()
-          ? msg.roomId.trim().slice(0, 30)
-          : "main";
-      const nextUsername =
-        typeof msg.username === "string" && msg.username.trim()
-          ? msg.username.trim().slice(0, 24)
-          : "Anonymous";
+    if (msg.type === "set-name") {
+      current.name = safeName(msg.name);
+      addChat("System", `${current.name} updated their name.`);
+      sendState();
+      return;
+    }
 
-      const prevRoomId = ws.roomId;
-      if (rooms.has(prevRoomId)) {
-        rooms.get(prevRoomId).clients.delete(ws);
-        sendUserCount(prevRoomId);
-      }
+    if (msg.type === "move") {
+      const dx = Number(msg.dx);
+      const dy = Number(msg.dy);
+      if (!Number.isInteger(dx) || !Number.isInteger(dy)) return;
+      if (Math.abs(dx) + Math.abs(dy) !== 1) return;
 
-      ws.roomId = nextRoomId;
-      ws.username = nextUsername;
-      const nextRoom = getOrCreateRoom(nextRoomId);
-      if (USE_DB && nextRoom.strokes.length === 0) {
-        try {
-          nextRoom.strokes = await loadRoomStrokes(nextRoomId);
-        } catch (error) {
-          console.error("Failed loading room from DB:", nextRoomId, error.message);
+      const nextX = current.x + dx;
+      const nextY = current.y + dy;
+      if (nextX < 0 || nextY < 0 || nextX >= GRID_SIZE || nextY >= GRID_SIZE) return;
+
+      current.x = nextX;
+      current.y = nextY;
+
+      for (const [id, other] of state.players.entries()) {
+        if (id !== current.id && other.x === current.x && other.y === current.y) {
+          current.score += 1;
+          addChat("System", `${current.name} tagged ${other.name} (+1 point).`);
+          break;
         }
       }
-      nextRoom.clients.add(ws);
-
-      ws.send(
-        JSON.stringify({
-          type: "init-state",
-          roomId: nextRoomId,
-          strokes: nextRoom.strokes,
-          count: nextRoom.clients.size,
-        })
-      );
-
-      sendUserCount(nextRoomId);
+      sendState();
       return;
     }
 
-    const activeRoom = getOrCreateRoom(ws.roomId);
-
-    if (msg.type === "draw-start" || msg.type === "draw-move" || msg.type === "draw-end") {
-      const event = {
-        type: msg.type,
-        roomId: ws.roomId,
-        username: ws.username,
-        strokeId: typeof msg.strokeId === "string" ? msg.strokeId : "",
-        x: Number(msg.x),
-        y: Number(msg.y),
-        color: typeof msg.color === "string" ? msg.color : "#111111",
-        size: Number(msg.size) || 3,
-      };
-
-      if (!Number.isFinite(event.x) || !Number.isFinite(event.y)) return;
-
-      // Save every drawing event so new users can replay full state.
-      activeRoom.strokes.push(event);
-
-      // Prevent unbounded memory growth for class project scale.
-      if (activeRoom.strokes.length > 50000) {
-        activeRoom.strokes.shift();
-      }
-
-      scheduleRoomSave(ws.roomId);
-      broadcastToRoom(ws.roomId, event, ws);
-      return;
-    }
-
-    if (msg.type === "clear-canvas") {
-      activeRoom.strokes = [];
-      scheduleRoomSave(ws.roomId);
-      broadcastToRoom(ws.roomId, { type: "clear-canvas", roomId: ws.roomId });
+    if (msg.type === "chat") {
+      const text = typeof msg.text === "string" ? msg.text.trim().slice(0, 120) : "";
+      if (!text) return;
+      addChat(current.name, text);
+      sendState();
     }
   });
 
   ws.on("close", () => {
-    const activeRoom = rooms.get(ws.roomId);
-    if (!activeRoom) return;
-    activeRoom.clients.delete(ws);
-    sendUserCount(ws.roomId);
-
-    // Optional cleanup when room becomes empty.
-    if (activeRoom.clients.size === 0) {
-      rooms.delete(ws.roomId);
+    const current = state.players.get(ws.playerId);
+    if (current) {
+      addChat("System", `${current.name} left the arena.`);
+      state.players.delete(ws.playerId);
+      sendState();
     }
   });
 });
 
 server.listen(PORT, () => {
-  console.log(`Collaborative Canvas running on port ${PORT}`);
-  console.log(USE_DB ? "Persistence: PostgreSQL enabled" : "Persistence: in-memory only");
-});
-
-ensureDbSchema().catch((error) => {
-  console.error("Database schema setup failed:", error.message);
+  console.log(`Grid Arena server running on port ${PORT}`);
 });
