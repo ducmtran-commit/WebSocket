@@ -1,24 +1,21 @@
-# Grid Arena (WebSocket Class Project)
+# Co-op Pixel Board (WebSocket Class Project)
 
-Grid Arena is a real-time multiplayer interaction app. Multiple users join the same board, move with arrow keys, tag each other for points, and chat live. Every interaction is synchronized through WebSockets.
+Co-op Pixel Board is a real-time multiplayer drawing app. Multiple users join the same board, paint pixels together, erase mistakes, zoom in/out, and chat live. All interactions are synchronized through WebSockets.
 
 ## Why This Fits The Assignment
 
-- Uses a Node.js server (`server.js`)
+- Uses one Node.js server (`server.js`)
 - Uses WebSockets (`ws`) for real-time communication
-- Two or more clients can connect and interact on shared state
+- Multiple clients connect to shared live state
 - Ready to deploy to Render as one web service
 
-## Interaction Design
+## Features
 
-Each connected user is represented by a colored square on a shared 14x14 grid.
-
-- Press arrow keys to move
-- When you move onto another player tile, you tag them and earn a point
-- Chat updates in real time for all players
-- Scoreboard updates live for everyone
-
-This makes the shared interaction obvious and easy to demo in class with two browser windows.
+- Shared pixel board (`96x72`)
+- Live co-op drawing and erasing
+- Zoom controls (`+`, `-`, slider, and `Ctrl + mouse wheel`)
+- Live chat and online artist list
+- Faster drawing via incremental/batched WebSocket updates
 
 ## Run Locally
 
@@ -27,17 +24,30 @@ npm install
 npm start
 ```
 
-Open `http://localhost:3000` in two tabs/windows to test multi-user interaction.
+Open `http://localhost:3000` in two browser tabs/windows to test collaboration.
 
-## Deploy On Render
+## Deploy To Render (Exact Steps)
 
-1. Push this project to GitHub
-2. Create a new **Web Service** on Render
-3. Set commands:
-   - Build Command: `npm install`
-   - Start Command: `npm start`
-4. Deploy and open the generated Render URL
+1. Push this repo to GitHub.
+2. In Render, click **New +** -> **Blueprint**.
+3. Select your GitHub repo.
+4. Render auto-detects `render.yaml` and creates the service.
+5. Wait for deploy to finish, then open your app URL (`https://...onrender.com`).
+6. Share that URL with classmates so they can join.
 
-## Suggested Submission Text
+## If Blueprint Is Not Available
 
-I built Grid Arena using Node.js, Express, and the `ws` WebSocket library. The server keeps a shared multiplayer state and broadcasts updates so all connected clients see movement, chat, and score changes instantly. The app demonstrates real-time multi-user interaction by letting players move on the same grid and tag each other for points.
+Create a **Web Service** manually with:
+
+- Build Command: `npm install`
+- Start Command: `npm start`
+- Environment: `Node`
+
+Optional env vars:
+
+- `NODE_ENV=production`
+- `NODE_VERSION=18`
+
+## Submission Text (Example)
+
+I built Co-op Pixel Board using Node.js, Express, and the `ws` WebSocket library. The server manages a shared pixel grid and broadcasts updates in real time so everyone can draw on the same board together. The app supports drawing, erasing, zooming, and chat, and is deployed on Render for public multi-user access.
