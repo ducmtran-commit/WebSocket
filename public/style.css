@@ -73,28 +73,24 @@ input {
 
 .board {
   display: grid;
-  grid-template-columns: repeat(14, 1fr);
-  gap: 2px;
+  grid-template-columns: repeat(32, 1fr);
+  gap: 1px;
   border: 1px solid #334155;
   border-radius: 10px;
   background: #020617;
   padding: 8px;
-  min-height: 540px;
+  min-height: 620px;
 }
 
 .cell {
-  border: 1px solid #1e293b;
-  border-radius: 6px;
+  border: 1px solid #111827;
+  border-radius: 2px;
   background: #0b1220;
   aspect-ratio: 1;
+  cursor: crosshair;
 }
 
-.cell.player {
-  border-color: #e2e8f0;
-  box-shadow: 0 0 0 2px rgba(226, 232, 240, 0.25) inset;
-}
-
-#scoreList {
+#userList {
   margin: 0;
   padding-left: 18px;
 }
