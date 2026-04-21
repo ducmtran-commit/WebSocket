@@ -16,6 +16,7 @@ const userList = document.getElementById("userList");
 const chatBox = document.getElementById("chatBox");
 const chatInput = document.getElementById("chatInput");
 const sendChatBtn = document.getElementById("sendChatBtn");
+const colorHistory = document.getElementById("colorHistory");
 
 let ws;
 let reconnectAttempts = 0;
@@ -28,6 +29,9 @@ let zoomLevel = 1;
 let cellEls = [];
 const pendingPixels = new Map();
 let flushTimer = null;
+const COLOR_HISTORY_KEY = "pixel-board-color-history";
+const MAX_COLOR_HISTORY = 10;
+let recentColors = [];
 
 function wsUrl() {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -37,6 +41,65 @@ function wsUrl() {
 function send(payload) {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(payload));
+  }
+}
+
+function normalizeHexColor(value) {
+  if (typeof value !== "string") return null;
+  const text = value.trim().toLowerCase();
+  return /^#[0-9a-f]{6}$/.test(text) ? text : null;
+}
+
+function saveColorHistory() {
+  try {
+    window.localStorage.setItem(COLOR_HISTORY_KEY, JSON.stringify(recentColors));
+  } catch {
+    // Ignore localStorage failures in restricted environments.
+  }
+}
+
+function renderColorHistory() {
+  colorHistory.innerHTML = "";
+  recentColors.forEach((color) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "color-swatch";
+    button.style.background = color;
+    button.title = color;
+    if (color === colorInput.value.toLowerCase()) {
+      button.classList.add("active");
+    }
+    button.addEventListener("click", () => {
+      colorInput.value = color;
+      if (isErasing) {
+        isErasing = false;
+        eraserBtn.textContent = "Eraser: Off";
+        toolText.textContent = "Tool: Brush";
+      }
+      renderColorHistory();
+    });
+    colorHistory.appendChild(button);
+  });
+}
+
+function addColorToHistory(colorValue) {
+  const color = normalizeHexColor(colorValue);
+  if (!color || color === ERASE_COLOR) return;
+  recentColors = [color, ...recentColors.filter((item) => item !== color)].slice(0, MAX_COLOR_HISTORY);
+  saveColorHistory();
+  renderColorHistory();
+}
+
+function loadColorHistory() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(COLOR_HISTORY_KEY) || "[]");
+    if (!Array.isArray(parsed)) return;
+    recentColors = parsed
+      .map((value) => normalizeHexColor(value))
+      .filter((value) => Boolean(value))
+      .slice(0, MAX_COLOR_HISTORY);
+  } catch {
+    recentColors = [];
   }
 }
 
@@ -186,6 +249,7 @@ function paintCellFromEvent(event) {
   const y = Number(target.dataset.y);
   if (!Number.isInteger(x) || !Number.isInteger(y)) return;
   const color = isErasing ? ERASE_COLOR : colorInput.value;
+  if (!isErasing) addColorToHistory(color);
   applyPixel(x, y, color);
   pendingPixels.set(`${x},${y}`, { x, y, color });
 }
@@ -247,6 +311,10 @@ zoomInBtn.addEventListener("click", () => {
   setZoom(zoomLevel + 0.1);
 });
 
+colorInput.addEventListener("change", () => {
+  addColorToHistory(colorInput.value);
+});
+
 board.addEventListener("wheel", (event) => {
   if (!event.ctrlKey) return;
   event.preventDefault();
@@ -289,4 +357,6 @@ window.addEventListener("keydown", (event) => {
 
 renderState(latestState);
 setZoom(0.7);
+loadColorHistory();
+addColorToHistory(colorInput.value);
 connect();
