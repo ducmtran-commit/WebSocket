@@ -3,40 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Collab canvas</title>
-    <link rel="stylesheet" href="/styles.css" />
+    <title>Real-Time Collaborative Drawing App</title>
+    <!-- This file links our CSS and sets up the page structure. -->
+    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <header class="bar">
-      <div class="brand">
-        <span class="dot" aria-hidden="true"></span>
-        <h1>Collab canvas</h1>
-      </div>
-      <p class="hint">Open this page in two windows — draw together in real time.</p>
-      <div class="status" id="status">Connecting…</div>
-    </header>
+    <div class="container">
+      <h1>Collaborative Drawing App</h1>
+      <p>Open this page in two browser windows and draw together in real time.</p>
 
-    <main class="layout">
-      <aside class="panel">
-        <label class="field">
-          <span>Your name</span>
-          <input id="name" type="text" maxlength="24" placeholder="e.g. Alex" autocomplete="nickname" />
-        </label>
-        <button type="button" id="saveName" class="btn primary">Save name</button>
-        <p class="you" id="youLabel"></p>
-        <hr />
-        <button type="button" id="clear" class="btn danger">Clear canvas for everyone</button>
-        <p class="small muted">Clears the shared board for all connected clients.</p>
-        <hr />
-        <h2>Connected</h2>
-        <ul id="peerList" class="peer-list"></ul>
-      </aside>
-      <div class="canvas-wrap">
-        <canvas id="board" width="1200" height="800" aria-label="Shared drawing canvas"></canvas>
-        <div id="cursors" class="cursors" aria-hidden="true"></div>
-      </div>
-    </main>
+      <button id="clearBtn">Clear Canvas</button>
+      <canvas id="canvas" width="900" height="500"></canvas>
+    </div>
 
-    <script src="/app.js"></script>
+    <!-- Socket.IO client library served automatically by the server -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="client.js"></script>
   </body>
 </html>
