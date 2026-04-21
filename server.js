@@ -8,8 +8,8 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 const PORT = process.env.PORT || 3000;
 
-const GRID_WIDTH = 96;
-const GRID_HEIGHT = 72;
+const GRID_WIDTH = 128;
+const GRID_HEIGHT = 96;
 const DEFAULT_PIXEL = "#0b1220";
 
 app.use(express.static(path.join(__dirname, "public")));
