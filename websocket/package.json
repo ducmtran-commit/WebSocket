@@ -1,18 +1,14 @@
 {
-  "name": "collab-canvas",
+  "name": "collaborative-drawing-app",
   "version": "1.0.0",
   "private": true,
-  "description": "Shared drawing canvas over WebSockets — multiple clients, one server.",
+  "description": "Beginner-friendly real-time collaborative drawing app using Node.js, Express, and Socket.IO.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
-  },
-  "engines": {
-    "node": ">=18"
+    "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.21.2",
-    "ws": "^8.18.0"
+    "socket.io": "^4.8.1"
   }
 }
