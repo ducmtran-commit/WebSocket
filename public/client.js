@@ -1,4 +1,5 @@
 const board = document.getElementById("board");
+const boardViewport = document.getElementById("boardViewport");
 const nameInput = document.getElementById("nameInput");
 const setNameBtn = document.getElementById("setNameBtn");
 const colorInput = document.getElementById("colorInput");
@@ -15,6 +16,8 @@ const userList = document.getElementById("userList");
 const chatBox = document.getElementById("chatBox");
 const chatInput = document.getElementById("chatInput");
 const sendChatBtn = document.getElementById("sendChatBtn");
+const navLeftBtn = document.getElementById("navLeftBtn");
+const navRightBtn = document.getElementById("navRightBtn");
 
 let ws;
 let reconnectAttempts = 0;
@@ -251,6 +254,20 @@ sendChatBtn.addEventListener("click", () => {
   if (!text) return;
   send({ type: "chat", text });
   chatInput.value = "";
+});
+
+function scrollBoardHorizontally(direction) {
+  if (!boardViewport) return;
+  const step = Math.max(120, Math.round(boardViewport.clientWidth * 0.65));
+  boardViewport.scrollBy({ left: direction * step, behavior: "smooth" });
+}
+
+navLeftBtn.addEventListener("click", () => {
+  scrollBoardHorizontally(-1);
+});
+
+navRightBtn.addEventListener("click", () => {
+  scrollBoardHorizontally(1);
 });
 
 chatInput.addEventListener("keydown", (event) => {
