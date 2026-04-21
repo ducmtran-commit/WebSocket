@@ -11,6 +11,7 @@ Collaborative Canvas explores drawing as a social activity instead of an individ
 - Node.js
 - Express
 - WebSocket with `ws`
+- PostgreSQL (optional persistence with `DATABASE_URL`)
 - Plain HTML/CSS/JavaScript
 
 ## Project Structure
@@ -60,7 +61,20 @@ Collaborative Canvas explores drawing as a social activity instead of an individ
 3. Use:
    - Build Command: `npm install`
    - Start Command: `npm start`
-4. Deploy.
+4. Add optional environment variables:
+   - `NODE_ENV=production`
+   - `DATABASE_URL=...` (Render Postgres internal URL, if you want persistent rooms)
+5. Deploy.
+
+## Optional Persistent Storage (like larger collaboration demos)
+
+By default, the app stores room strokes in memory.  
+If you set `DATABASE_URL`, the server automatically:
+
+- creates a `canvas_rooms` table
+- loads room strokes from Postgres on join
+- batches stroke saves to Postgres while users draw
+- keeps room state after server restarts
 
 ## Add Final Links Before Submission
 
