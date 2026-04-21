@@ -100,6 +100,15 @@ input {
   font-size: 0.9rem;
 }
 
+.chat-line {
+  margin-bottom: 4px;
+}
+
+.chat-author {
+  font-weight: 700;
+  color: #93c5fd;
+}
+
 .board {
   display: grid;
   gap: 1px;
