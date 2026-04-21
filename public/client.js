@@ -4,6 +4,10 @@ const setNameBtn = document.getElementById("setNameBtn");
 const colorInput = document.getElementById("colorInput");
 const eraserBtn = document.getElementById("eraserBtn");
 const clearBtn = document.getElementById("clearBtn");
+const zoomInput = document.getElementById("zoomInput");
+const zoomOutBtn = document.getElementById("zoomOutBtn");
+const zoomInBtn = document.getElementById("zoomInBtn");
+const zoomText = document.getElementById("zoomText");
 const toolText = document.getElementById("toolText");
 const statusText = document.getElementById("statusText");
 const playersText = document.getElementById("playersText");
@@ -15,10 +19,11 @@ const sendChatBtn = document.getElementById("sendChatBtn");
 let ws;
 let reconnectAttempts = 0;
 let reconnectTimer = null;
-let latestState = { gridWidth: 32, gridHeight: 24, pixels: [], users: [], chat: [] };
+let latestState = { gridWidth: 64, gridHeight: 48, pixels: [], users: [], chat: [] };
 let isPainting = false;
 let isErasing = false;
 const ERASE_COLOR = "#0b1220";
+let zoomLevel = 1;
 
 function wsUrl() {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -33,7 +38,9 @@ function send(payload) {
 
 function renderBoard(state) {
   board.innerHTML = "";
-  board.style.gridTemplateColumns = `repeat(${state.gridWidth}, 1fr)`;
+  const pixelSize = Math.max(6, Math.round(14 * zoomLevel));
+  board.style.gridTemplateColumns = `repeat(${state.gridWidth}, ${pixelSize}px)`;
+  board.style.gridAutoRows = `${pixelSize}px`;
 
   for (let y = 0; y < state.gridHeight; y += 1) {
     for (let x = 0; x < state.gridWidth; x += 1) {
@@ -45,6 +52,14 @@ function renderBoard(state) {
       board.appendChild(cell);
     }
   }
+}
+
+function setZoom(nextZoom) {
+  const clamped = Math.min(2.5, Math.max(0.5, Number(nextZoom)));
+  zoomLevel = clamped;
+  zoomInput.value = String(clamped);
+  zoomText.textContent = `Zoom: ${Math.round(clamped * 100)}%`;
+  renderBoard(latestState);
 }
 
 function renderChat(chat) {
@@ -149,6 +164,25 @@ clearBtn.addEventListener("click", () => {
   send({ type: "clear-board" });
 });
 
+zoomInput.addEventListener("input", () => {
+  setZoom(zoomInput.value);
+});
+
+zoomOutBtn.addEventListener("click", () => {
+  setZoom(zoomLevel - 0.1);
+});
+
+zoomInBtn.addEventListener("click", () => {
+  setZoom(zoomLevel + 0.1);
+});
+
+board.addEventListener("wheel", (event) => {
+  if (!event.ctrlKey) return;
+  event.preventDefault();
+  const step = event.deltaY < 0 ? 0.1 : -0.1;
+  setZoom(zoomLevel + step);
+});
+
 sendChatBtn.addEventListener("click", () => {
   const text = chatInput.value.trim();
   if (!text) return;
@@ -163,4 +197,5 @@ chatInput.addEventListener("keydown", (event) => {
 });
 
 renderState(latestState);
+setZoom(1);
 connect();
