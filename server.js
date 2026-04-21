@@ -8,19 +8,16 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 const PORT = process.env.PORT || 3000;
 
-const GRID_SIZE = 14;
-const SPAWN_POINTS = [
-  { x: 0, y: 0 },
-  { x: GRID_SIZE - 1, y: GRID_SIZE - 1 },
-  { x: 0, y: GRID_SIZE - 1 },
-  { x: GRID_SIZE - 1, y: 0 },
-];
+const GRID_WIDTH = 32;
+const GRID_HEIGHT = 24;
+const DEFAULT_PIXEL = "#0b1220";
 
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/health", (_req, res) => res.status(200).send("ok"));
 
 const state = {
-  players: new Map(),
+  users: new Map(),
+  pixels: Array.from({ length: GRID_HEIGHT }, () => Array(GRID_WIDTH).fill(DEFAULT_PIXEL)),
   chat: [],
 };
 
@@ -29,25 +26,17 @@ function randomColor() {
   return palette[Math.floor(Math.random() * palette.length)];
 }
 
-function nextSpawn() {
-  const point = SPAWN_POINTS[state.players.size % SPAWN_POINTS.length];
-  return { ...point };
-}
-
 function safeName(value) {
-  if (typeof value !== "string") return "Player";
+  if (typeof value !== "string") return "Artist";
   const cleaned = value.trim().slice(0, 20);
-  return cleaned || "Player";
+  return cleaned || "Artist";
 }
 
-function serializePlayers() {
-  return Array.from(state.players.values()).map((player) => ({
-    id: player.id,
-    name: player.name,
-    color: player.color,
-    x: player.x,
-    y: player.y,
-    score: player.score,
+function serializeUsers() {
+  return Array.from(state.users.values()).map((user) => ({
+    id: user.id,
+    name: user.name,
+    color: user.color,
   }));
 }
 
@@ -63,8 +52,10 @@ function broadcast(payload) {
 function sendState() {
   broadcast({
     type: "state",
-    gridSize: GRID_SIZE,
-    players: serializePlayers(),
+    gridWidth: GRID_WIDTH,
+    gridHeight: GRID_HEIGHT,
+    pixels: state.pixels,
+    users: serializeUsers(),
     chat: state.chat,
   });
 }
@@ -75,21 +66,17 @@ function addChat(author, text) {
 }
 
 wss.on("connection", (ws) => {
-  const playerId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const spawn = nextSpawn();
-  const player = {
-    id: playerId,
-    name: "Player",
+  const userId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const user = {
+    id: userId,
+    name: "Artist",
     color: randomColor(),
-    x: spawn.x,
-    y: spawn.y,
-    score: 0,
   };
 
-  state.players.set(playerId, player);
-  ws.playerId = playerId;
+  state.users.set(userId, user);
+  ws.userId = userId;
 
-  addChat("System", `${player.name} joined the arena.`);
+  addChat("System", `${user.name} joined the board.`);
   sendState();
 
   ws.on("message", (raw) => {
@@ -101,7 +88,7 @@ wss.on("connection", (ws) => {
     }
 
     if (!msg || typeof msg.type !== "string") return;
-    const current = state.players.get(ws.playerId);
+    const current = state.users.get(ws.userId);
     if (!current) return;
 
     if (msg.type === "set-name") {
@@ -111,26 +98,22 @@ wss.on("connection", (ws) => {
       return;
     }
 
-    if (msg.type === "move") {
-      const dx = Number(msg.dx);
-      const dy = Number(msg.dy);
-      if (!Number.isInteger(dx) || !Number.isInteger(dy)) return;
-      if (Math.abs(dx) + Math.abs(dy) !== 1) return;
+    if (msg.type === "paint") {
+      const x = Number(msg.x);
+      const y = Number(msg.y);
+      const color = typeof msg.color === "string" ? msg.color : current.color;
+      if (!Number.isInteger(x) || !Number.isInteger(y)) return;
+      if (x < 0 || y < 0 || x >= GRID_WIDTH || y >= GRID_HEIGHT) return;
+      if (!/^#[0-9a-fA-F]{6}$/.test(color)) return;
 
-      const nextX = current.x + dx;
-      const nextY = current.y + dy;
-      if (nextX < 0 || nextY < 0 || nextX >= GRID_SIZE || nextY >= GRID_SIZE) return;
+      state.pixels[y][x] = color;
+      sendState();
+      return;
+    }
 
-      current.x = nextX;
-      current.y = nextY;
-
-      for (const [id, other] of state.players.entries()) {
-        if (id !== current.id && other.x === current.x && other.y === current.y) {
-          current.score += 1;
-          addChat("System", `${current.name} tagged ${other.name} (+1 point).`);
-          break;
-        }
-      }
+    if (msg.type === "clear-board") {
+      state.pixels = Array.from({ length: GRID_HEIGHT }, () => Array(GRID_WIDTH).fill(DEFAULT_PIXEL));
+      addChat("System", `${current.name} cleared the board.`);
       sendState();
       return;
     }
@@ -144,15 +127,15 @@ wss.on("connection", (ws) => {
   });
 
   ws.on("close", () => {
-    const current = state.players.get(ws.playerId);
+    const current = state.users.get(ws.userId);
     if (current) {
-      addChat("System", `${current.name} left the arena.`);
-      state.players.delete(ws.playerId);
+      addChat("System", `${current.name} left the board.`);
+      state.users.delete(ws.userId);
       sendState();
     }
   });
 });
 
 server.listen(PORT, () => {
-  console.log(`Grid Arena server running on port ${PORT}`);
+  console.log(`Pixel Board server running on port ${PORT}`);
 });
