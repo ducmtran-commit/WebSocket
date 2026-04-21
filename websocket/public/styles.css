@@ -1,0 +1,254 @@
+:root {
+  --bg: #0f1419;
+  --panel: #1a2332;
+  --text: #e8eef7;
+  --muted: #8b9cb3;
+  --accent: #3d8bfd;
+  --danger: #f07178;
+  --line: #2a3545;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+  background: #121922;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+}
+
+.hint {
+  margin: 0;
+  flex: 1;
+  min-width: 200px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.status {
+  font-size: 0.85rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+
+.status.ok {
+  border-color: #2a9d8f;
+  color: #9ee1d4;
+}
+
+.status.bad {
+  border-color: var(--danger);
+  color: #ffc4c7;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) 1fr;
+  gap: 0;
+  min-height: calc(100vh - 56px);
+}
+
+@media (max-width: 800px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel {
+  padding: 1rem 1.25rem;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+}
+
+@media (max-width: 800px) {
+  .panel {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.field span {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+input[type="text"] {
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #0f1419;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.btn {
+  display: inline-block;
+  width: 100%;
+  margin-bottom: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #243044;
+  color: var(--text);
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.btn:hover {
+  filter: brightness(1.08);
+}
+
+.btn.primary {
+  background: #1e4d8f;
+  border-color: #2a6cbd;
+}
+
+.btn.danger {
+  background: #5c2a2e;
+  border-color: #8a3d42;
+}
+
+.you {
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+}
+
+.you strong {
+  color: var(--accent);
+}
+
+hr {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 1rem 0;
+}
+
+h2 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.peer-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.peer-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.peer-list li:last-child {
+  border-bottom: none;
+}
+
+.swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.small {
+  font-size: 0.8rem;
+  margin: 0.25rem 0 0;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.canvas-wrap {
+  position: relative;
+  padding: 0.75rem;
+  overflow: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+#board {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  background: #faf9f6;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.cursors {
+  position: absolute;
+  inset: 0.75rem;
+  pointer-events: none;
+}
+
+.remote-cursor {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  white-space: nowrap;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #111;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.remote-cursor::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: inherit;
+}
