@@ -19,7 +19,7 @@ const sendChatBtn = document.getElementById("sendChatBtn");
 let ws;
 let reconnectAttempts = 0;
 let reconnectTimer = null;
-let latestState = { gridWidth: 64, gridHeight: 48, pixels: [], users: [], chat: [] };
+let latestState = { gridWidth: 96, gridHeight: 72, pixels: [], users: [], chat: [] };
 let isPainting = false;
 let isErasing = false;
 const ERASE_COLOR = "#0b1220";
@@ -197,5 +197,5 @@ chatInput.addEventListener("keydown", (event) => {
 });
 
 renderState(latestState);
-setZoom(1);
+setZoom(0.8);
 connect();
