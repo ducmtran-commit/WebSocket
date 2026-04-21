@@ -48,8 +48,9 @@
       <section class="right">
         <div class="nav-row">
           <span>Navigator</span>
-          <button id="navLeftBtn" type="button">◀ Left</button>
-          <button id="navRightBtn" type="button">Right ▶</button>
+          <button id="navLeftBtn" type="button" aria-label="Scroll left">◀</button>
+          <input id="navRange" class="nav-range" type="range" min="0" max="100" value="0" />
+          <button id="navRightBtn" type="button" aria-label="Scroll right">▶</button>
         </div>
         <div id="boardViewport" class="board-viewport">
           <div id="board" class="board"></div>
