@@ -21,14 +21,23 @@ ctx.strokeStyle = myColor;
 ctx.lineWidth = 3;
 ctx.lineCap = "round";
 
-// Draw one line segment on the local canvas
-function drawLine(x0, y0, x1, y1, color, size) {
+// Draw a tiny colored name tag near the stroke endpoint.
+function drawNameTag(x, y, username, color) {
+  if (!username) return;
+  ctx.font = "11px Arial";
+  ctx.fillStyle = color || "#222";
+  ctx.fillText(username, x + 6, y - 6);
+}
+
+// Draw one line segment on the local canvas.
+function drawLine(x0, y0, x1, y1, color, size, username) {
   ctx.beginPath();
   ctx.strokeStyle = color || "#222";
   ctx.lineWidth = size || 3;
   ctx.moveTo(x0, y0);
   ctx.lineTo(x1, y1);
   ctx.stroke();
+  drawNameTag(x1, y1, username, color);
 }
 
 // Convert mouse position to canvas coordinates
@@ -62,7 +71,7 @@ canvas.addEventListener("mousemove", (event) => {
   };
 
   // Draw locally first, then broadcast
-  drawLine(line.x0, line.y0, line.x1, line.y1, line.color, line.size);
+  drawLine(line.x0, line.y0, line.x1, line.y1, line.color, line.size, line.username);
   socket.emit("draw", line);
 
   lastX = pos.x;
@@ -89,13 +98,13 @@ brushSizeSlider.addEventListener("input", () => {
 
 // Draw lines received from any user
 socket.on("draw", (line) => {
-  drawLine(line.x0, line.y0, line.x1, line.y1, line.color, line.size);
+  drawLine(line.x0, line.y0, line.x1, line.y1, line.color, line.size, line.username);
 });
 
 // Load history when we first connect
 socket.on("load-canvas", (history) => {
   history.forEach((line) => {
-    drawLine(line.x0, line.y0, line.x1, line.y1, line.color, line.size);
+    drawLine(line.x0, line.y0, line.x1, line.y1, line.color, line.size, line.username);
   });
 });
 
