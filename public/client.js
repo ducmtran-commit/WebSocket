@@ -24,6 +24,9 @@ let isPainting = false;
 let isErasing = false;
 const ERASE_COLOR = "#0b1220";
 let zoomLevel = 1;
+let cellEls = [];
+const pendingPixels = new Map();
+let flushTimer = null;
 
 function wsUrl() {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -36,8 +39,9 @@ function send(payload) {
   }
 }
 
-function renderBoard(state) {
+function createBoard(state) {
   board.innerHTML = "";
+  cellEls = Array.from({ length: state.gridHeight }, () => Array(state.gridWidth).fill(null));
   const pixelSize = Math.max(6, Math.round(14 * zoomLevel));
   board.style.gridTemplateColumns = `repeat(${state.gridWidth}, ${pixelSize}px)`;
   board.style.gridAutoRows = `${pixelSize}px`;
@@ -49,7 +53,25 @@ function renderBoard(state) {
       cell.dataset.x = String(x);
       cell.dataset.y = String(y);
       cell.style.background = state.pixels?.[y]?.[x] || "#0b1220";
+      cellEls[y][x] = cell;
       board.appendChild(cell);
+    }
+  }
+}
+
+function applyPixel(x, y, color) {
+  if (!Number.isInteger(x) || !Number.isInteger(y)) return;
+  const row = latestState.pixels[y];
+  const cell = cellEls[y]?.[x];
+  if (!row || !cell) return;
+  row[x] = color;
+  cell.style.background = color;
+}
+
+function clearBoardLocal() {
+  for (let y = 0; y < latestState.gridHeight; y += 1) {
+    for (let x = 0; x < latestState.gridWidth; x += 1) {
+      applyPixel(x, y, ERASE_COLOR);
     }
   }
 }
@@ -59,7 +81,7 @@ function setZoom(nextZoom) {
   zoomLevel = clamped;
   zoomInput.value = String(clamped);
   zoomText.textContent = `Zoom: ${Math.round(clamped * 100)}%`;
-  renderBoard(latestState);
+  createBoard(latestState);
 }
 
 function renderChat(chat) {
@@ -85,7 +107,7 @@ function renderUsers(users) {
 function renderState(state) {
   latestState = state;
   playersText.textContent = `Artists online: ${state.users.length}`;
-  renderBoard(state);
+  createBoard(state);
   renderChat(state.chat);
   renderUsers(state.users);
 }
@@ -112,8 +134,31 @@ function connect() {
     } catch {
       return;
     }
-    if (msg.type === "state") {
+    if (msg.type === "init-state") {
       renderState(msg);
+      return;
+    }
+
+    if (msg.type === "users") {
+      latestState.users = msg.users || [];
+      playersText.textContent = `Artists online: ${latestState.users.length}`;
+      renderUsers(latestState.users);
+      return;
+    }
+
+    if (msg.type === "chat-history") {
+      latestState.chat = msg.chat || [];
+      renderChat(latestState.chat);
+      return;
+    }
+
+    if (msg.type === "pixel-update") {
+      applyPixel(Number(msg.x), Number(msg.y), msg.color);
+      return;
+    }
+
+    if (msg.type === "board-cleared") {
+      clearBoardLocal();
     }
   });
 
@@ -133,21 +178,38 @@ function paintCellFromEvent(event) {
   const y = Number(target.dataset.y);
   if (!Number.isInteger(x) || !Number.isInteger(y)) return;
   const color = isErasing ? ERASE_COLOR : colorInput.value;
-  send({ type: "paint", x, y, color });
+  applyPixel(x, y, color);
+  pendingPixels.set(`${x},${y}`, { x, y, color });
+}
+
+function flushPaintBatch() {
+  flushTimer = null;
+  if (pendingPixels.size === 0) return;
+  const pixels = Array.from(pendingPixels.values());
+  pendingPixels.clear();
+  send({ type: "paint-batch", pixels });
+}
+
+function scheduleFlush() {
+  if (flushTimer) return;
+  flushTimer = window.setTimeout(flushPaintBatch, 16);
 }
 
 board.addEventListener("mousedown", (event) => {
   isPainting = true;
   paintCellFromEvent(event);
+  scheduleFlush();
 });
 
 board.addEventListener("mouseover", (event) => {
   if (!isPainting) return;
   paintCellFromEvent(event);
+  scheduleFlush();
 });
 
 window.addEventListener("mouseup", () => {
   isPainting = false;
+  flushPaintBatch();
 });
 
 setNameBtn.addEventListener("click", () => {
@@ -161,6 +223,7 @@ eraserBtn.addEventListener("click", () => {
 });
 
 clearBtn.addEventListener("click", () => {
+  clearBoardLocal();
   send({ type: "clear-board" });
 });
 
