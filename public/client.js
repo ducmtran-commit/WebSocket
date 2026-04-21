@@ -40,6 +40,13 @@ function send(payload) {
   }
 }
 
+function shouldHandleCanvasShortcut(event) {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return true;
+  const tag = target.tagName;
+  return tag !== "INPUT" && tag !== "TEXTAREA" && !target.isContentEditable;
+}
+
 function createBoard(state) {
   board.innerHTML = "";
   cellEls = Array.from({ length: state.gridHeight }, () => Array(state.gridWidth).fill(null));
@@ -258,6 +265,26 @@ chatInput.addEventListener("keydown", (event) => {
   if (event.key !== "Enter") return;
   event.preventDefault();
   sendChatBtn.click();
+});
+
+window.addEventListener("keydown", (event) => {
+  if (!shouldHandleCanvasShortcut(event)) return;
+  const isCmdOrCtrl = event.ctrlKey || event.metaKey;
+  if (!isCmdOrCtrl) return;
+
+  const key = event.key.toLowerCase();
+  if (key === "z" && !event.shiftKey) {
+    event.preventDefault();
+    flushPaintBatch();
+    send({ type: "undo" });
+    return;
+  }
+
+  if (key === "y" || (key === "z" && event.shiftKey)) {
+    event.preventDefault();
+    flushPaintBatch();
+    send({ type: "redo" });
+  }
 });
 
 renderState(latestState);
