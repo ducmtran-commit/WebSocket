@@ -1,7 +1,27 @@
 // client.js
 // This file handles drawing on the canvas and sending/receiving live updates.
 
-const socket = io(); // Connect to our Socket.IO server
+const DEFAULT_REMOTE_SERVER = "https://your-render-service.onrender.com";
+const isGitHubPages = window.location.hostname.endsWith("github.io");
+
+// On localhost we use same-origin.
+// On GitHub Pages we ask once for your backend URL and save it.
+let socketServerUrl = "";
+if (isGitHubPages) {
+  socketServerUrl = localStorage.getItem("socketServerUrl") || DEFAULT_REMOTE_SERVER;
+  if (socketServerUrl === DEFAULT_REMOTE_SERVER) {
+    const enteredUrl = window.prompt(
+      "Enter your deployed backend URL (example: https://my-draw-app.onrender.com):",
+      socketServerUrl
+    );
+    if (enteredUrl && enteredUrl.trim()) {
+      socketServerUrl = enteredUrl.trim();
+      localStorage.setItem("socketServerUrl", socketServerUrl);
+    }
+  }
+}
+
+const socket = socketServerUrl ? io(socketServerUrl) : io(); // Connect to Socket.IO server
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const clearBtn = document.getElementById("clearBtn");
@@ -131,4 +151,9 @@ socket.on("user-profile", (profile) => {
 // Show how many users are connected.
 socket.on("user-count", (count) => {
   userCountEl.textContent = `Users online: ${count}`;
+});
+
+socket.on("connect_error", () => {
+  userCountEl.textContent = "Users online: offline";
+  userInfoEl.textContent = "User: connection failed";
 });
