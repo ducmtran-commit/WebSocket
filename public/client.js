@@ -18,6 +18,7 @@ const chatInput = document.getElementById("chatInput");
 const sendChatBtn = document.getElementById("sendChatBtn");
 const navLeftBtn = document.getElementById("navLeftBtn");
 const navRightBtn = document.getElementById("navRightBtn");
+const navRange = document.getElementById("navRange");
 
 let ws;
 let reconnectAttempts = 0;
@@ -30,6 +31,7 @@ let zoomLevel = 1;
 let cellEls = [];
 const pendingPixels = new Map();
 let flushTimer = null;
+let navMax = 0;
 
 function wsUrl() {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -60,6 +62,15 @@ function createBoard(state) {
       board.appendChild(cell);
     }
   }
+  updateNavigatorMetrics();
+}
+
+function updateNavigatorMetrics() {
+  if (!boardViewport) return;
+  navMax = Math.max(0, boardViewport.scrollWidth - boardViewport.clientWidth);
+  navRange.max = String(navMax);
+  navRange.value = String(Math.min(navMax, Math.max(0, Math.round(boardViewport.scrollLeft))));
+  navRange.disabled = navMax === 0;
 }
 
 function applyPixel(x, y, color) {
@@ -268,6 +279,20 @@ navLeftBtn.addEventListener("click", () => {
 
 navRightBtn.addEventListener("click", () => {
   scrollBoardHorizontally(1);
+});
+
+navRange.addEventListener("input", () => {
+  if (!boardViewport) return;
+  boardViewport.scrollLeft = Number(navRange.value) || 0;
+});
+
+boardViewport.addEventListener("scroll", () => {
+  if (navMax <= 0) return;
+  navRange.value = String(Math.round(boardViewport.scrollLeft));
+});
+
+window.addEventListener("resize", () => {
+  updateNavigatorMetrics();
 });
 
 chatInput.addEventListener("keydown", (event) => {
