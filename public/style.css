@@ -10,7 +10,7 @@ body {
 }
 
 .layout {
-  max-width: 1500px;
+  max-width: 1700px;
   margin: 0 auto;
   padding: 20px;
   display: grid;
@@ -91,21 +91,9 @@ input {
   width: max-content;
 }
 
-.nav-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #cbd5e1;
-  font-size: 0.9rem;
-}
-
-.nav-range {
-  flex: 1;
-}
-
 .board-viewport {
   overflow: auto;
-  max-height: 78vh;
+  max-height: 82vh;
   border: 1px solid #334155;
   border-radius: 10px;
 }
