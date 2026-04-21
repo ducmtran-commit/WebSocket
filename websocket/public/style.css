@@ -23,6 +23,26 @@ p {
   color: #444;
 }
 
+.toolbar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+
+.info {
+  display: flex;
+  gap: 10px;
+  font-size: 14px;
+  color: #333;
+}
+
+#brushSize {
+  vertical-align: middle;
+}
+
 #clearBtn {
   margin: 12px 0;
   padding: 10px 16px;
