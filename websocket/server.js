@@ -17,15 +17,52 @@ app.use(express.static(path.join(__dirname, "public")));
 
 // Keep all line segments in memory so new users can see existing drawing.
 const strokes = [];
+const users = new Map();
+
+// Create a random color string like "#3fa9d2".
+function randomColor() {
+  const value = Math.floor(Math.random() * 0xffffff);
+  return `#${value.toString(16).padStart(6, "0")}`;
+}
+
+function broadcastUserCount() {
+  io.emit("user-count", users.size);
+}
 
 io.on("connection", (socket) => {
   console.log(`User connected: ${socket.id}`);
 
+  // Ask the new user to send their username first.
+  socket.emit("request-join");
+
   // Send existing drawing history to the newly connected client only.
   socket.emit("load-canvas", strokes);
+  broadcastUserCount();
+
+  socket.on("join-user", (rawName) => {
+    const username =
+      typeof rawName === "string" && rawName.trim()
+        ? rawName.trim().slice(0, 20)
+        : "Anonymous";
+    const color = randomColor();
+
+    users.set(socket.id, { username, color });
+    socket.emit("user-profile", { username, color });
+    broadcastUserCount();
+  });
 
   // Receive a new line segment and broadcast it to other users.
   socket.on("draw", (line) => {
+    if (!line || typeof line !== "object") return;
+    if (
+      typeof line.x0 !== "number" ||
+      typeof line.y0 !== "number" ||
+      typeof line.x1 !== "number" ||
+      typeof line.y1 !== "number"
+    ) {
+      return;
+    }
+
     strokes.push(line);
     socket.broadcast.emit("draw", line);
   });
@@ -37,6 +74,8 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
+    users.delete(socket.id);
+    broadcastUserCount();
     console.log(`User disconnected: ${socket.id}`);
   });
 });
