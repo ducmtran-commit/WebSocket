@@ -68,6 +68,7 @@ let dragLastY = 0;
 let activeDragGroup = [];
 const panelLinks = new Map();
 const PANEL_DOCK_GAP = 10;
+let isLayoutCustomized = false;
 const COLOR_HISTORY_KEY = "pixel-board-color-history";
 const MAX_COLOR_HISTORY = 10;
 let recentColors = [];
@@ -285,7 +286,17 @@ function syncToolboxButtons() {
   }
 }
 
+function markLayoutCustomized() {
+  if (isLayoutCustomized) return;
+  isLayoutCustomized = true;
+  document.body.classList.add("customized-layout");
+  updateGroupFabVisibility();
+}
+
 function setToolboxMinimized(nextState) {
+  if (nextState) {
+    markLayoutCustomized();
+  }
   isToolboxMinimized = nextState;
   if (toolbox instanceof HTMLElement) {
     toolbox.classList.toggle("minimized", isToolboxMinimized);
@@ -297,6 +308,9 @@ function setToolboxMinimized(nextState) {
 }
 
 function setChatMinimized(nextState) {
+  if (nextState) {
+    markLayoutCustomized();
+  }
   isChatMinimized = nextState;
   if (chatPanel instanceof HTMLElement) {
     chatPanel.classList.toggle("minimized", isChatMinimized);
@@ -305,6 +319,9 @@ function setChatMinimized(nextState) {
 }
 
 function setArtistsMinimized(nextState) {
+  if (nextState) {
+    markLayoutCustomized();
+  }
   isArtistsMinimized = nextState;
   if (artistsPanel instanceof HTMLElement) {
     artistsPanel.classList.toggle("minimized", isArtistsMinimized);
@@ -315,6 +332,7 @@ function setArtistsMinimized(nextState) {
 function dragActivePanel(event) {
   if (!(activeDraggedPanel instanceof HTMLElement)) return;
   panelDragMoved = true;
+  markLayoutCustomized();
   const deltaX = event.clientX - dragLastX;
   const deltaY = event.clientY - dragLastY;
   dragLastX = event.clientX;
@@ -384,6 +402,7 @@ function linkPanels(a, b) {
 
 function unlinkPanel(panel) {
   if (!(panel instanceof HTMLElement)) return;
+  markLayoutCustomized();
   const links = panelLinks.get(panel);
   if (!links) return;
   links.forEach((neighbor) => {
@@ -406,7 +425,7 @@ function hasAnyLinkedPanels() {
 
 function updateGroupFabVisibility() {
   if (!(groupFab instanceof HTMLElement)) return;
-  groupFab.classList.toggle("visible", hasAnyLinkedPanels());
+  groupFab.classList.toggle("visible", hasAnyLinkedPanels() && isLayoutCustomized);
 }
 
 function getLinkedPanelGroup(start) {
