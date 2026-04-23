@@ -51,6 +51,9 @@ let workspaceDragging = false;
 let workspaceDragLastX = 0;
 let workspaceDragLastY = 0;
 let sectionReorder = null;
+const SECTION_REORDER_SLOT_UNSET = Symbol("sectionReorderSlot");
+/** Last drop target for placeholder; avoids repeat `insertBefore` / `appendChild` every mousemove. */
+let sectionReorderInsertBefore = SECTION_REORDER_SLOT_UNSET;
 const COLOR_HISTORY_KEY = "pixel-board-color-history";
 const MAX_COLOR_HISTORY = 10;
 let recentColors = [];
@@ -104,12 +107,14 @@ function renderColorHistory() {
   });
 }
 
-function addColorToHistory(colorValue) {
+function addColorToHistory(colorValue, options = {}) {
   const color = normalizeHexColor(colorValue);
   if (!color || color === ERASE_COLOR) return;
   recentColors = [color, ...recentColors.filter((item) => item !== color)].slice(0, MAX_COLOR_HISTORY);
   saveColorHistory();
-  renderColorHistory();
+  if (!options.skipRender) {
+    renderColorHistory();
+  }
 }
 
 function loadColorHistory() {
@@ -335,6 +340,7 @@ function startSectionReorder(section, clientY) {
   row.style.width = `${rect.width}px`;
   row.style.zIndex = "60";
   row.style.marginBottom = "0";
+  sectionReorderInsertBefore = SECTION_REORDER_SLOT_UNSET;
   sectionReorder = {
     row,
     placeholder,
@@ -361,6 +367,10 @@ function moveSectionReorder(clientY) {
       break;
     }
   }
+  if (insertBefore === sectionReorderInsertBefore) {
+    return;
+  }
+  sectionReorderInsertBefore = insertBefore;
   if (insertBefore) {
     stack.insertBefore(placeholder, insertBefore);
   } else {
@@ -381,6 +391,7 @@ function stopSectionReorder() {
   row.style.width = "";
   row.style.zIndex = "";
   row.style.marginBottom = "";
+  sectionReorderInsertBefore = SECTION_REORDER_SLOT_UNSET;
   sectionReorder = null;
 }
 
@@ -586,7 +597,7 @@ function paintCellFromEvent(event) {
   const y = Number(target.dataset.y);
   if (!Number.isInteger(x) || !Number.isInteger(y)) return;
   const color = isErasing ? ERASE_COLOR : colorInput.value;
-  if (!isErasing) addColorToHistory(color);
+  if (!isErasing) addColorToHistory(color, { skipRender: true });
   applyPixel(x, y, color);
   pendingPixels.set(`${x},${y}`, { x, y, color });
 }
@@ -609,6 +620,7 @@ function stopPainting() {
   isPainting = false;
   setToolboxDrawingHidden(false);
   flushPaintBatch();
+  renderColorHistory();
 }
 
 board.addEventListener("mousedown", (event) => {
@@ -647,13 +659,13 @@ boardViewport.addEventListener("mousedown", (event) => {
 });
 
 window.addEventListener("mousemove", (event) => {
-  if (sectionReorder) {
-    moveSectionReorder(event.clientY);
-  } else {
-    dragWorkspace(event);
-  }
   if (isPainting && (event.buttons & 1) !== 1) {
     stopPainting();
+  }
+  if (sectionReorder) {
+    moveSectionReorder(event.clientY);
+  } else if (workspaceDragging) {
+    dragWorkspace(event);
   }
   if (!isPanning) return;
   const deltaX = event.clientX - panStartX;
