@@ -8,85 +8,70 @@
   </head>
   <body>
     <main class="layout">
-      <section id="toolboxPanel" class="left floating-panel">
-        <button id="toolboxFab" class="toolbox-fab" type="button" aria-label="Open toolbox">🎨</button>
-        <div id="toolboxHandle" class="left-drag-handle">
-          <span class="drag-title">Drag Toolbox</span>
+      <section id="workspacePanel" class="workspace-panel floating-panel">
+        <div id="workspaceHandle" class="workspace-drag-handle">
+          <span class="drag-title">Workspace</span>
           <div class="panel-actions">
-            <button id="undockToolboxBtn" type="button">Undock</button>
             <button id="autoHideBtn" type="button">Auto-hide: On</button>
           </div>
         </div>
-        <div class="toolbox-content">
-          <h1>Co-op Pixel Board</h1>
-          <p class="subtitle">Everyone paints the same board in real time.</p>
-          <div class="panel">
-          <label for="nameInput">Display Name</label>
-          <div class="row">
-            <input id="nameInput" type="text" maxlength="20" value="Student" />
-            <button id="setNameBtn">Update</button>
-          </div>
-          <label for="colorInput">Brush Color</label>
-          <div class="row">
-            <input id="colorInput" type="color" value="#22c55e" />
-            <button id="eraserBtn">Eraser: Off</button>
-            <button id="clearBtn">Clear My Drawing</button>
-          </div>
-          <label>Color History</label>
-          <div id="colorHistory" class="color-history"></div>
-          <label for="zoomInput">Zoom</label>
-          <div class="row">
-            <button id="zoomOutBtn">-</button>
-            <input id="zoomInput" type="range" min="0.7" max="1.4" step="0.05" value="0.9" />
-            <button id="zoomInBtn">+</button>
-          </div>
-          <p id="zoomText">Zoom: 100%</p>
-          <p id="toolText">Tool: Brush</p>
-          <p id="statusText">Status: connecting...</p>
-          <p id="playersText">Artists online: 0</p>
-          </div>
-        </div>
-      </section>
-
-      <section id="chatPanel" class="chat-panel floating-panel">
-        <button id="chatFab" class="toolbox-fab" type="button" aria-label="Open chat">💬</button>
-        <div id="chatHandle" class="left-drag-handle">
-          <span class="drag-title">Drag Chat</span>
-          <div class="panel-actions">
-            <button id="toggleChatBtn" type="button">_</button>
-            <button id="undockChatBtn" type="button">Undock</button>
-          </div>
-        </div>
-        <div class="chat-content">
-          <div class="panel">
-            <h2>Chat</h2>
-            <div id="chatBox" class="chat-box"></div>
-            <div class="row">
-              <input id="chatInput" type="text" maxlength="120" placeholder="Say something..." />
-              <button id="sendChatBtn">Send</button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="artistsPanel" class="artists-panel floating-panel">
-        <button id="artistsFab" class="toolbox-fab" type="button" aria-label="Open artists">👥</button>
-        <div id="artistsHandle" class="left-drag-handle">
-          <span class="drag-title">Drag Artists</span>
-          <div class="panel-actions">
-            <button id="toggleArtistsBtn" type="button">_</button>
-            <button id="undockArtistsBtn" type="button">Undock</button>
-          </div>
-        </div>
-        <div class="artists-content">
-          <div class="panel">
-            <h3>Artists Online</h3>
-            <ul id="userList"></ul>
+        <div class="workspace-inner">
+          <nav class="workspace-nav" aria-label="Navigate sections">
+            <button type="button" id="navScrollUp" class="nav-scroll-btn" aria-label="Scroll up">↑</button>
+            <button type="button" class="nav-jump" data-target="section-toolbox">Tools</button>
+            <button type="button" class="nav-jump" data-target="section-chat">Chat</button>
+            <button type="button" class="nav-jump" data-target="section-artists">Artists</button>
+            <button type="button" id="navScrollDown" class="nav-scroll-btn" aria-label="Scroll down">↓</button>
+          </nav>
+          <div id="workspaceScroll" class="workspace-scroll">
+            <section id="section-toolbox" class="workspace-section">
+              <h1>Co-op Pixel Board</h1>
+              <p class="subtitle">Everyone paints the same board in real time.</p>
+              <div class="panel">
+                <label for="nameInput">Display Name</label>
+                <div class="row">
+                  <input id="nameInput" type="text" maxlength="20" value="Student" />
+                  <button id="setNameBtn">Update</button>
+                </div>
+                <label for="colorInput">Brush Color</label>
+                <div class="row">
+                  <input id="colorInput" type="color" value="#22c55e" />
+                  <button id="eraserBtn">Eraser: Off</button>
+                  <button id="clearBtn">Clear My Drawing</button>
+                </div>
+                <label>Color History</label>
+                <div id="colorHistory" class="color-history"></div>
+                <label for="zoomInput">Zoom</label>
+                <div class="row">
+                  <button id="zoomOutBtn">-</button>
+                  <input id="zoomInput" type="range" min="0.7" max="1.4" step="0.05" value="0.9" />
+                  <button id="zoomInBtn">+</button>
+                </div>
+                <p id="zoomText">Zoom: 100%</p>
+                <p id="toolText">Tool: Brush</p>
+                <p id="statusText">Status: connecting...</p>
+                <p id="playersText">Artists online: 0</p>
+              </div>
+            </section>
+            <section id="section-chat" class="workspace-section">
+              <div class="panel">
+                <h2>Chat</h2>
+                <div id="chatBox" class="chat-box"></div>
+                <div class="row">
+                  <input id="chatInput" type="text" maxlength="120" placeholder="Say something..." />
+                  <button id="sendChatBtn">Send</button>
+                </div>
+              </div>
+            </section>
+            <section id="section-artists" class="workspace-section">
+              <div class="panel">
+                <h3>Artists Online</h3>
+                <ul id="userList"></ul>
+              </div>
+            </section>
           </div>
         </div>
       </section>
-
-      <button id="groupFab" class="toolbox-fab group-fab" type="button" aria-label="Panel folder">🧩</button>
 
       <section class="right">
         <div id="boardViewport" class="board-viewport">
