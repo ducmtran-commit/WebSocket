@@ -327,29 +327,30 @@ function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
     ? clamp(anchorClientY - viewportRect.top, 0, Math.max(0, viewH - 1e-6))
     : viewH / 2;
 
-  const worldX = (boardViewport.scrollLeft + anchorX) / prevZoom;
-  const worldY = (boardViewport.scrollTop + anchorY) / prevZoom;
+  // Screen position of zoom pivot (viewport client coords → document client coords).
+  const ax = viewportRect.left + anchorX;
+  const ay = viewportRect.top + anchorY;
+
+  // Board edge before applying the new scale (transform-origin: top left → this stays fixed).
+  const boardRect = board.getBoundingClientRect();
+  const ratio = clamped / prevZoom;
 
   zoomLevel = clamped;
   zoomInput.value = String(clamped);
   zoomText.textContent = `Zoom: ${Math.round(clamped * 100)}%`;
   board.style.transform = `scale(${zoomLevel})`;
 
-  const nextScrollLeft = worldX * zoomLevel - anchorX;
-  const nextScrollTop = worldY * zoomLevel - anchorY;
+  // Refresh layout so scrollWidth/height match the new scale before clamping scroll.
+  void board.offsetWidth;
 
-  const applyScroll = () => {
-    const maxLeft = Math.max(0, boardViewport.scrollWidth - boardViewport.clientWidth);
-    const maxTop = Math.max(0, boardViewport.scrollHeight - boardViewport.clientHeight);
-    boardViewport.scrollLeft = clamp(nextScrollLeft, 0, maxLeft);
-    boardViewport.scrollTop = clamp(nextScrollTop, 0, maxTop);
-  };
+  // Keep the board point under (ax, ay) stable: scroll += (offset from board left)*(scale ratio - 1).
+  const nextScrollLeft = boardViewport.scrollLeft + (ax - boardRect.left) * (ratio - 1);
+  const nextScrollTop = boardViewport.scrollTop + (ay - boardRect.top) * (ratio - 1);
 
-  if (hasAnchor) {
-    requestAnimationFrame(applyScroll);
-  } else {
-    applyScroll();
-  }
+  const maxLeft = Math.max(0, boardViewport.scrollWidth - boardViewport.clientWidth);
+  const maxTop = Math.max(0, boardViewport.scrollHeight - boardViewport.clientHeight);
+  boardViewport.scrollLeft = clamp(nextScrollLeft, 0, maxLeft);
+  boardViewport.scrollTop = clamp(nextScrollTop, 0, maxTop);
 }
 
 function shouldStartPanning(event) {
