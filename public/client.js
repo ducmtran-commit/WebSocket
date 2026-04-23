@@ -656,7 +656,14 @@ function flushPaintBatch() {
 
 function scheduleFlush() {
   if (flushTimer) return;
-  flushTimer = window.setTimeout(flushPaintBatch, 16);
+  flushTimer = window.setTimeout(flushPaintBatch, 8);
+}
+
+function stopPainting() {
+  if (!isPainting) return;
+  isPainting = false;
+  setToolboxDrawingHidden(false);
+  flushPaintBatch();
 }
 
 board.addEventListener("mousedown", (event) => {
@@ -670,6 +677,10 @@ board.addEventListener("mousedown", (event) => {
 
 board.addEventListener("mouseover", (event) => {
   if (!isPainting) return;
+  if ((event.buttons & 1) !== 1) {
+    stopPainting();
+    return;
+  }
   paintCellFromEvent(event);
   scheduleFlush();
 });
@@ -680,9 +691,7 @@ window.addEventListener("mouseup", () => {
     isPanning = false;
     boardViewport.classList.remove("is-panning");
   }
-  isPainting = false;
-  setToolboxDrawingHidden(false);
-  flushPaintBatch();
+  stopPainting();
 });
 
 boardViewport.addEventListener("mousedown", (event) => {
@@ -693,11 +702,24 @@ boardViewport.addEventListener("mousedown", (event) => {
 
 window.addEventListener("mousemove", (event) => {
   dragActivePanel(event);
+  if (isPainting && (event.buttons & 1) !== 1) {
+    stopPainting();
+  }
   if (!isPanning) return;
   const deltaX = event.clientX - panStartX;
   const deltaY = event.clientY - panStartY;
   boardViewport.scrollLeft = panScrollLeft - deltaX;
   boardViewport.scrollTop = panScrollTop - deltaY;
+});
+
+window.addEventListener("blur", () => {
+  stopPainting();
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") {
+    stopPainting();
+  }
 });
 
 if (autoHideBtn instanceof HTMLElement) {
