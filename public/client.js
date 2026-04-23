@@ -39,6 +39,12 @@ const pendingRemotePixels = new Map();
 let remotePixelFlushRaf = null;
 const ERASE_COLOR = "#0b1220";
 const BASE_PIXEL_SIZE = 8;
+/** Must match `.board` border + padding in `style.css` (layout space, pre-transform). */
+const BOARD_BORDER_PX = 1;
+const BOARD_PADDING_PX = 8;
+/** Grid `gap` between tracks (px). */
+const BOARD_GRID_GAP_PX = 1;
+const CELL_STRIDE_PX = BASE_PIXEL_SIZE + BOARD_GRID_GAP_PX;
 const MIN_ZOOM = 0.7;
 const MAX_ZOOM = 1.4;
 let zoomLevel = 1;
@@ -201,13 +207,29 @@ function clientIsOverBoardViewport(clientX, clientY) {
 
 function pickCellFromPoint(clientX, clientY) {
   if (!(board instanceof HTMLElement)) return null;
-  const stack = document.elementsFromPoint(clientX, clientY);
-  for (const node of stack) {
-    if (node instanceof HTMLElement && node.classList.contains("cell") && board.contains(node)) {
-      return node;
-    }
-  }
-  return null;
+  const gw = latestState.gridWidth;
+  const gh = latestState.gridHeight;
+  if (!Number.isFinite(gw) || !Number.isFinite(gh) || gw <= 0 || gh <= 0) return null;
+
+  const rect = board.getBoundingClientRect();
+  const z = zoomLevel;
+  if (!(z > 0)) return null;
+
+  const localX = (clientX - rect.left) / z;
+  const localY = (clientY - rect.top) / z;
+  const innerX = localX - BOARD_BORDER_PX - BOARD_PADDING_PX;
+  const innerY = localY - BOARD_BORDER_PX - BOARD_PADDING_PX;
+  if (innerX < 0 || innerY < 0) return null;
+
+  const xi = Math.floor(innerX / CELL_STRIDE_PX);
+  const yi = Math.floor(innerY / CELL_STRIDE_PX);
+  if (xi < 0 || yi < 0 || xi >= gw || yi >= gh) return null;
+
+  const rx = innerX - xi * CELL_STRIDE_PX;
+  const ry = innerY - yi * CELL_STRIDE_PX;
+  if (rx >= BASE_PIXEL_SIZE || ry >= BASE_PIXEL_SIZE) return null;
+
+  return cellEls[yi]?.[xi] ?? null;
 }
 
 function eachGridOnLine(x0, y0, x1, y1, visit) {
@@ -259,7 +281,6 @@ function paintAtClient(clientX, clientY) {
   eachGridOnLine(lastPaintGrid.x, lastPaintGrid.y, x, y, (px, py) => {
     paintOne(px, py);
   });
-  if (!isErasing) addColorToHistory(color, { skipRender: true });
   lastPaintGrid = { x, y };
 }
 
@@ -708,13 +729,23 @@ function paintCellFromEvent(event) {
   paintAtClient(event.clientX, event.clientY);
 }
 
+/** Max DOM updates per frame for merged `pixels-updated` batches (keeps UI responsive). */
+const REMOTE_PIXEL_APPLY_CHUNK = 450;
+
 function flushRemotePixelBatch() {
   remotePixelFlushRaf = null;
   if (pendingRemotePixels.size === 0) return;
-  for (const pixel of pendingRemotePixels.values()) {
+  let n = 0;
+  for (const key of pendingRemotePixels.keys()) {
+    if (n >= REMOTE_PIXEL_APPLY_CHUNK) break;
+    const pixel = pendingRemotePixels.get(key);
+    pendingRemotePixels.delete(key);
     applyPixel(Number(pixel.x), Number(pixel.y), pixel.color);
+    n += 1;
   }
-  pendingRemotePixels.clear();
+  if (pendingRemotePixels.size > 0) {
+    remotePixelFlushRaf = requestAnimationFrame(flushRemotePixelBatch);
+  }
 }
 
 function queueRemotePixels(pixels) {
