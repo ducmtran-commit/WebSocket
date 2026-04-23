@@ -39,6 +39,8 @@ const BASE_PIXEL_SIZE = 8;
 const MIN_ZOOM = 0.7;
 const MAX_ZOOM = 1.4;
 let zoomLevel = 1;
+/** Last pointer position over the board viewport (for zoom +/- / slider to zoom toward cursor). */
+let boardZoomAnchorClient = null;
 let cellEls = [];
 const pendingPixels = new Map();
 let flushTimer = null;
@@ -263,10 +265,21 @@ function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
   if (!Number.isFinite(clamped)) return;
 
   const viewportRect = boardViewport.getBoundingClientRect();
-  const anchorX =
-    typeof anchorClientX === "number" ? anchorClientX - viewportRect.left : boardViewport.clientWidth / 2;
-  const anchorY =
-    typeof anchorClientY === "number" ? anchorClientY - viewportRect.top : boardViewport.clientHeight / 2;
+  const viewW = boardViewport.clientWidth;
+  const viewH = boardViewport.clientHeight;
+  const hasAnchor =
+    typeof anchorClientX === "number" &&
+    Number.isFinite(anchorClientX) &&
+    typeof anchorClientY === "number" &&
+    Number.isFinite(anchorClientY);
+
+  const anchorX = hasAnchor
+    ? clamp(anchorClientX - viewportRect.left, 0, Math.max(0, viewW - 1e-6))
+    : viewW / 2;
+  const anchorY = hasAnchor
+    ? clamp(anchorClientY - viewportRect.top, 0, Math.max(0, viewH - 1e-6))
+    : viewH / 2;
+
   const worldX = (boardViewport.scrollLeft + anchorX) / prevZoom;
   const worldY = (boardViewport.scrollTop + anchorY) / prevZoom;
 
@@ -277,8 +290,19 @@ function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
 
   const nextScrollLeft = worldX * zoomLevel - anchorX;
   const nextScrollTop = worldY * zoomLevel - anchorY;
-  boardViewport.scrollLeft = Math.max(0, nextScrollLeft);
-  boardViewport.scrollTop = Math.max(0, nextScrollTop);
+
+  const applyScroll = () => {
+    const maxLeft = Math.max(0, boardViewport.scrollWidth - boardViewport.clientWidth);
+    const maxTop = Math.max(0, boardViewport.scrollHeight - boardViewport.clientHeight);
+    boardViewport.scrollLeft = clamp(nextScrollLeft, 0, maxLeft);
+    boardViewport.scrollTop = clamp(nextScrollTop, 0, maxTop);
+  };
+
+  if (hasAnchor) {
+    requestAnimationFrame(applyScroll);
+  } else {
+    applyScroll();
+  }
 }
 
 function shouldStartPanning(event) {
@@ -772,15 +796,27 @@ clearBtn.addEventListener("click", () => {
 });
 
 zoomInput.addEventListener("input", () => {
-  setZoom(zoomInput.value);
+  if (boardZoomAnchorClient) {
+    setZoom(zoomInput.value, boardZoomAnchorClient.x, boardZoomAnchorClient.y);
+  } else {
+    setZoom(zoomInput.value);
+  }
 });
 
 zoomOutBtn.addEventListener("click", () => {
-  setZoom(zoomLevel - 0.05);
+  if (boardZoomAnchorClient) {
+    setZoom(zoomLevel - 0.05, boardZoomAnchorClient.x, boardZoomAnchorClient.y);
+  } else {
+    setZoom(zoomLevel - 0.05);
+  }
 });
 
 zoomInBtn.addEventListener("click", () => {
-  setZoom(zoomLevel + 0.05);
+  if (boardZoomAnchorClient) {
+    setZoom(zoomLevel + 0.05, boardZoomAnchorClient.x, boardZoomAnchorClient.y);
+  } else {
+    setZoom(zoomLevel + 0.05);
+  }
 });
 
 colorInput.addEventListener("change", () => {
@@ -798,18 +834,35 @@ function wheelZoomStep(event) {
   return clamp(-delta * sensitivity, -0.12, 0.12);
 }
 
-boardViewport.addEventListener(
-  "wheel",
-  (event) => {
-    if (!(boardViewport instanceof HTMLElement)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const step = wheelZoomStep(event);
-    if (step === 0) return;
-    setZoom(zoomLevel + step, event.clientX, event.clientY);
-  },
-  { passive: false }
-);
+if (boardViewport instanceof HTMLElement) {
+  boardViewport.addEventListener(
+    "wheel",
+    (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const step = wheelZoomStep(event);
+      if (step === 0) return;
+      boardZoomAnchorClient = { x: event.clientX, y: event.clientY };
+      setZoom(zoomLevel + step, event.clientX, event.clientY);
+    },
+    { passive: false }
+  );
+
+  boardViewport.addEventListener("pointermove", (event) => {
+    const r = boardViewport.getBoundingClientRect();
+    if (
+      event.clientX >= r.left &&
+      event.clientX < r.right &&
+      event.clientY >= r.top &&
+      event.clientY < r.bottom
+    ) {
+      boardZoomAnchorClient = { x: event.clientX, y: event.clientY };
+    }
+  });
+  boardViewport.addEventListener("pointerleave", () => {
+    boardZoomAnchorClient = null;
+  });
+}
 
 sendChatBtn.addEventListener("click", () => {
   const text = chatInput.value.trim();
