@@ -13,11 +13,10 @@ body {
 .layout {
   width: 100%;
   margin: 0;
-  padding: 20px;
-  display: grid;
-  gap: 16px;
-  grid-template-columns: minmax(280px, 340px) 1fr;
+  padding: 16px;
   min-height: 100vh;
+  height: 100vh;
+  position: relative;
 }
 
 .left,
@@ -30,6 +29,38 @@ body {
 .subtitle {
   margin: 0;
   color: #94a3b8;
+}
+
+.left {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  width: min(380px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  z-index: 40;
+  padding: 12px;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(4px);
+}
+
+.left-drag-handle {
+  cursor: move;
+  user-select: none;
+  margin: -2px 0 8px;
+  padding: 6px 10px;
+  border: 1px dashed #475569;
+  border-radius: 8px;
+  color: #cbd5e1;
+  background: #111827;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.left.is-dragging {
+  user-select: none;
 }
 
 #toolText {
@@ -125,7 +156,7 @@ input {
 .board-viewport {
   overflow: auto;
   width: 100%;
-  height: calc(100vh - 56px);
+  height: calc(100vh - 32px);
   border: 1px solid #334155;
   border-radius: 10px;
   cursor: grab;
@@ -148,13 +179,30 @@ input {
   padding-left: 18px;
 }
 
+.legend {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: min(240px, calc(100vw - 32px));
+  max-height: 40vh;
+  overflow: auto;
+  z-index: 30;
+}
+
 @media (max-width: 920px) {
-  .layout {
-    grid-template-columns: 1fr;
-    min-height: auto;
+  .left {
+    width: min(340px, calc(100vw - 24px));
+    top: 12px;
+    left: 12px;
+    max-height: calc(100vh - 24px);
   }
 
   .board-viewport {
-    height: 65vh;
+    height: calc(100vh - 24px);
+  }
+
+  .legend {
+    right: 12px;
+    bottom: 12px;
   }
 }
