@@ -51,6 +51,8 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* `backdrop-filter` on large fixed layers is expensive; solid bg is enough here. */
+  backdrop-filter: none;
 }
 
 .workspace-panel.workspace-ui-collapsed {
