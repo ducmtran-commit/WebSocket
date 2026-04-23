@@ -19,6 +19,8 @@ const sendChatBtn = document.getElementById("sendChatBtn");
 const colorHistory = document.getElementById("colorHistory");
 const toolbox = document.querySelector(".left");
 const toolboxHandle = document.getElementById("toolboxHandle");
+const toggleToolboxBtn = document.getElementById("toggleToolboxBtn");
+const autoHideBtn = document.getElementById("autoHideBtn");
 
 let ws;
 let reconnectAttempts = 0;
@@ -40,6 +42,8 @@ let isSpaceHeld = false;
 let isDraggingToolbox = false;
 let toolboxDragOffsetX = 0;
 let toolboxDragOffsetY = 0;
+let isToolboxMinimized = false;
+let shouldAutoHideToolbox = true;
 const COLOR_HISTORY_KEY = "pixel-board-color-history";
 const MAX_COLOR_HISTORY = 10;
 let recentColors = [];
@@ -206,6 +210,35 @@ function dragToolbox(event) {
   toolbox.style.top = `${nextTop}px`;
 }
 
+function syncToolboxButtons() {
+  if (toggleToolboxBtn instanceof HTMLElement) {
+    toggleToolboxBtn.textContent = isToolboxMinimized ? "Expand" : "Minimize";
+  }
+  if (autoHideBtn instanceof HTMLElement) {
+    autoHideBtn.textContent = `Auto-hide: ${shouldAutoHideToolbox ? "On" : "Off"}`;
+  }
+}
+
+function setToolboxMinimized(nextState) {
+  isToolboxMinimized = nextState;
+  if (toolbox instanceof HTMLElement) {
+    toolbox.classList.toggle("minimized", isToolboxMinimized);
+    if (isToolboxMinimized) {
+      toolbox.classList.remove("auto-hidden");
+    }
+  }
+  syncToolboxButtons();
+}
+
+function setToolboxDrawingHidden(shouldHide) {
+  if (!(toolbox instanceof HTMLElement)) return;
+  if (!shouldAutoHideToolbox || isToolboxMinimized) {
+    toolbox.classList.remove("auto-hidden");
+    return;
+  }
+  toolbox.classList.toggle("auto-hidden", shouldHide);
+}
+
 function renderChat(chat) {
   chatBox.innerHTML = "";
   const colorByName = new Map(
@@ -340,6 +373,7 @@ board.addEventListener("mousedown", (event) => {
   if (shouldStartPanning(event)) return;
   if (event.button !== 0) return;
   isPainting = true;
+  setToolboxDrawingHidden(true);
   paintCellFromEvent(event);
   scheduleFlush();
 });
@@ -362,6 +396,7 @@ window.addEventListener("mouseup", () => {
     boardViewport.classList.remove("is-panning");
   }
   isPainting = false;
+  setToolboxDrawingHidden(false);
   flushPaintBatch();
 });
 
@@ -382,9 +417,24 @@ window.addEventListener("mousemove", (event) => {
 
 if (toolboxHandle instanceof HTMLElement) {
   toolboxHandle.addEventListener("mousedown", (event) => {
+    if (event.target instanceof HTMLElement && event.target.closest("button")) return;
     if (event.button !== 0) return;
     event.preventDefault();
     startToolboxDrag(event);
+  });
+}
+
+if (toggleToolboxBtn instanceof HTMLElement) {
+  toggleToolboxBtn.addEventListener("click", () => {
+    setToolboxMinimized(!isToolboxMinimized);
+  });
+}
+
+if (autoHideBtn instanceof HTMLElement) {
+  autoHideBtn.addEventListener("click", () => {
+    shouldAutoHideToolbox = !shouldAutoHideToolbox;
+    setToolboxDrawingHidden(false);
+    syncToolboxButtons();
   });
 }
 
@@ -476,6 +526,7 @@ window.addEventListener("keyup", (event) => {
 
 renderState(latestState);
 setZoom(1);
+syncToolboxButtons();
 loadColorHistory();
 addColorToHistory(colorInput.value);
 connect();
