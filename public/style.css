@@ -81,12 +81,13 @@ body {
   font-weight: 700;
 }
 
-.toolbox-actions {
+.panel-actions {
   display: flex;
   gap: 6px;
+  margin-left: auto;
 }
 
-.toolbox-actions button {
+.panel-actions button {
   padding: 4px 8px;
   font-size: 0.8rem;
 }
@@ -138,6 +139,19 @@ body {
 }
 
 .floating-panel.minimized .toolbox-fab {
+  display: block;
+}
+
+.group-fab {
+  position: fixed;
+  left: 50%;
+  top: 16px;
+  transform: translateX(-50%);
+  z-index: 45;
+  display: none;
+}
+
+.group-fab.visible {
   display: block;
 }
 
