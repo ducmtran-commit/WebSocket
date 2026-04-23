@@ -61,6 +61,7 @@ let dragLastX = 0;
 let dragLastY = 0;
 let activeDragGroup = [];
 const panelLinks = new Map();
+const PANEL_DOCK_GAP = 10;
 const COLOR_HISTORY_KEY = "pixel-board-color-history";
 const MAX_COLOR_HISTORY = 10;
 let recentColors = [];
@@ -399,7 +400,7 @@ function getLinkedPanelGroup(start) {
 
 function attemptSnapConnections(activePanel) {
   if (!(activePanel instanceof HTMLElement)) return;
-  const SNAP_DISTANCE = 24;
+  const SNAP_DISTANCE = 34;
   const activeRect = activePanel.getBoundingClientRect();
   let bestSnap = null;
 
@@ -417,25 +418,45 @@ function attemptSnapConnections(activePanel) {
     if (canSnapRight && verticalOverlap > 12) {
       const distance = Math.abs(activeRect.right - rect.left);
       if (!bestSnap || distance < bestSnap.distance) {
-        bestSnap = { candidate, deltaX: rect.left - activeRect.right, deltaY: 0, distance };
+        bestSnap = {
+          candidate,
+          deltaX: rect.left - activeRect.right - PANEL_DOCK_GAP,
+          deltaY: 0,
+          distance,
+        };
       }
     }
     if (canSnapLeft && verticalOverlap > 12) {
       const distance = Math.abs(activeRect.left - rect.right);
       if (!bestSnap || distance < bestSnap.distance) {
-        bestSnap = { candidate, deltaX: rect.right - activeRect.left, deltaY: 0, distance };
+        bestSnap = {
+          candidate,
+          deltaX: rect.right - activeRect.left + PANEL_DOCK_GAP,
+          deltaY: 0,
+          distance,
+        };
       }
     }
     if (canSnapBottom && horizontalOverlap > 12) {
       const distance = Math.abs(activeRect.bottom - rect.top);
       if (!bestSnap || distance < bestSnap.distance) {
-        bestSnap = { candidate, deltaX: 0, deltaY: rect.top - activeRect.bottom, distance };
+        bestSnap = {
+          candidate,
+          deltaX: 0,
+          deltaY: rect.top - activeRect.bottom - PANEL_DOCK_GAP,
+          distance,
+        };
       }
     }
     if (canSnapTop && horizontalOverlap > 12) {
       const distance = Math.abs(activeRect.top - rect.bottom);
       if (!bestSnap || distance < bestSnap.distance) {
-        bestSnap = { candidate, deltaX: 0, deltaY: rect.bottom - activeRect.top, distance };
+        bestSnap = {
+          candidate,
+          deltaX: 0,
+          deltaY: rect.bottom - activeRect.top + PANEL_DOCK_GAP,
+          distance,
+        };
       }
     }
   }
@@ -460,6 +481,11 @@ function toggleArtistsMinimized() {
 
 function setupPanelInteractions(panel, handle, fab, toggleMinimized) {
   if (panel instanceof HTMLElement) {
+    panel.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      unlinkPanel(panel);
+    });
+
     panel.addEventListener("mousedown", (event) => {
       if (event.button !== 0) return;
       const target = event.target;
