@@ -49,6 +49,8 @@ let shouldAutoHideToolbox = true;
 let activeDraggedPanel = null;
 let panelDragOffsetX = 0;
 let panelDragOffsetY = 0;
+let panelDragMoved = false;
+let dragStartedOnFab = false;
 const COLOR_HISTORY_KEY = "pixel-board-color-history";
 const MAX_COLOR_HISTORY = 10;
 let recentColors = [];
@@ -194,9 +196,11 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
-function startPanelDrag(panel, event) {
+function startPanelDrag(panel, event, startedOnFab = false) {
   if (!(panel instanceof HTMLElement)) return;
   activeDraggedPanel = panel;
+  panelDragMoved = false;
+  dragStartedOnFab = startedOnFab;
   const rect = panel.getBoundingClientRect();
   panelDragOffsetX = event.clientX - rect.left;
   panelDragOffsetY = event.clientY - rect.top;
@@ -221,6 +225,8 @@ function setToolboxMinimized(nextState) {
     toolbox.classList.toggle("minimized", isToolboxMinimized);
     if (isToolboxMinimized) {
       toolbox.classList.remove("auto-hidden");
+    } else {
+      fitPanelIntoViewport(toolbox);
     }
   }
   syncToolboxButtons();
@@ -230,12 +236,16 @@ function setChatMinimized(nextState) {
   isChatMinimized = nextState;
   if (chatPanel instanceof HTMLElement) {
     chatPanel.classList.toggle("minimized", isChatMinimized);
+    if (!isChatMinimized) {
+      fitPanelIntoViewport(chatPanel);
+    }
   }
   syncToolboxButtons();
 }
 
 function dragActivePanel(event) {
   if (!(activeDraggedPanel instanceof HTMLElement)) return;
+  panelDragMoved = true;
   const maxLeft = window.innerWidth - activeDraggedPanel.offsetWidth;
   const maxTop = window.innerHeight - activeDraggedPanel.offsetHeight;
   const nextLeft = clamp(event.clientX - panelDragOffsetX, 0, Math.max(0, maxLeft));
@@ -251,6 +261,17 @@ function stopPanelDrag() {
   if (!(activeDraggedPanel instanceof HTMLElement)) return;
   activeDraggedPanel.classList.remove("is-dragging");
   activeDraggedPanel = null;
+}
+
+function fitPanelIntoViewport(panel) {
+  if (!(panel instanceof HTMLElement)) return;
+  const maxLeft = Math.max(0, window.innerWidth - panel.offsetWidth);
+  const maxTop = Math.max(0, window.innerHeight - panel.offsetHeight);
+  const currentLeft = panel.offsetLeft;
+  const currentTop = panel.offsetTop;
+  panel.style.left = `${clamp(currentLeft, 0, maxLeft)}px`;
+  panel.style.top = `${clamp(currentTop, 0, maxTop)}px`;
+  panel.style.right = "auto";
 }
 
 function toggleToolboxMinimized() {
@@ -275,7 +296,7 @@ function setupPanelInteractions(panel, handle, fab, toggleMinimized) {
       if (event.target instanceof HTMLElement && event.target.closest("button")) return;
       if (event.button !== 0) return;
       event.preventDefault();
-      startPanelDrag(panel, event);
+      startPanelDrag(panel, event, false);
     });
   }
 
@@ -283,12 +304,16 @@ function setupPanelInteractions(panel, handle, fab, toggleMinimized) {
     fab.addEventListener("mousedown", (event) => {
       if (event.button !== 0) return;
       event.preventDefault();
-      if (fab === toolboxFab) {
-        setToolboxMinimized(false);
-      } else if (fab === chatFab) {
-        setChatMinimized(false);
+      startPanelDrag(panel, event, true);
+    });
+    fab.addEventListener("click", () => {
+      if (dragStartedOnFab && panelDragMoved) {
+        panelDragMoved = false;
+        dragStartedOnFab = false;
+        return;
       }
-      startPanelDrag(panel, event);
+      dragStartedOnFab = false;
+      toggleMinimized();
     });
   }
 }
