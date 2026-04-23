@@ -25,7 +25,7 @@ const autoHideBtn = document.getElementById("autoHideBtn");
 let ws;
 let reconnectAttempts = 0;
 let reconnectTimer = null;
-let latestState = { gridWidth: 128, gridHeight: 96, pixels: [], users: [], chat: [] };
+let latestState = { gridWidth: 256, gridHeight: 192, pixels: [], users: [], chat: [] };
 let isPainting = false;
 let isErasing = false;
 const ERASE_COLOR = "#0b1220";
