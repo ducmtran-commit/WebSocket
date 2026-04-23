@@ -314,6 +314,7 @@ function setToolboxMinimized(nextState) {
       toolbox.classList.remove("auto-hidden");
     }
   }
+  reflowLinkedOpenPanels(toolbox);
   syncToolboxButtons();
 }
 
@@ -325,6 +326,7 @@ function setChatMinimized(nextState) {
   if (chatPanel instanceof HTMLElement) {
     chatPanel.classList.toggle("minimized", isChatMinimized);
   }
+  reflowLinkedOpenPanels(chatPanel);
   syncToolboxButtons();
 }
 
@@ -336,6 +338,7 @@ function setArtistsMinimized(nextState) {
   if (artistsPanel instanceof HTMLElement) {
     artistsPanel.classList.toggle("minimized", isArtistsMinimized);
   }
+  reflowLinkedOpenPanels(artistsPanel);
   syncToolboxButtons();
 }
 
@@ -457,6 +460,42 @@ function getLinkedPanelGroup(start) {
     });
   }
   return Array.from(visited);
+}
+
+function reflowLinkedOpenPanels(sourcePanel) {
+  if (!(sourcePanel instanceof HTMLElement)) return;
+  const group = getLinkedPanelGroup(sourcePanel).filter(
+    (panel) => panel instanceof HTMLElement && !panel.classList.contains("minimized")
+  );
+  if (group.length < 2) return;
+
+  const COLUMN_THRESHOLD = 80;
+  const columns = [];
+  const sortedByLeft = [...group].sort((a, b) => a.offsetLeft - b.offsetLeft);
+  sortedByLeft.forEach((panel) => {
+    const col = columns.find((item) => Math.abs(item.left - panel.offsetLeft) <= COLUMN_THRESHOLD);
+    if (col) {
+      col.panels.push(panel);
+      col.left = Math.round((col.left + panel.offsetLeft) / 2);
+    } else {
+      columns.push({ left: panel.offsetLeft, panels: [panel] });
+    }
+  });
+
+  columns.forEach((column) => {
+    const panels = column.panels.sort((a, b) => a.offsetTop - b.offsetTop);
+    if (panels.length < 2) return;
+    let currentTop = panels[0].offsetTop;
+    panels.forEach((panel, index) => {
+      if (index === 0) {
+        currentTop = panel.offsetTop + panel.offsetHeight + PANEL_DOCK_GAP;
+        return;
+      }
+      panel.style.top = `${currentTop}px`;
+      panel.style.right = "auto";
+      currentTop += panel.offsetHeight + PANEL_DOCK_GAP;
+    });
+  });
 }
 
 function attemptSnapConnections(activePanel) {
