@@ -1041,15 +1041,15 @@ window.addEventListener("keyup", (event) => {
 
 renderState(latestState);
 setZoom(0.9);
-setToolboxMinimized(false);
-setChatMinimized(false);
-setArtistsMinimized(false);
+setToolboxMinimized(true);
+setChatMinimized(true);
+setArtistsMinimized(true);
 if (toolbox instanceof HTMLElement && chatPanel instanceof HTMLElement && artistsPanel instanceof HTMLElement) {
   toolbox.style.left = "24px";
-  toolbox.style.top = "40px";
-  chatPanel.style.left = `${toolbox.offsetLeft + toolbox.offsetWidth + PANEL_DOCK_GAP}px`;
-  chatPanel.style.top = "40px";
-  artistsPanel.style.left = chatPanel.style.left;
+  toolbox.style.top = "24px";
+  chatPanel.style.left = toolbox.style.left;
+  chatPanel.style.top = `${toolbox.offsetTop + toolbox.offsetHeight + PANEL_DOCK_GAP}px`;
+  artistsPanel.style.left = toolbox.style.left;
   artistsPanel.style.top = `${chatPanel.offsetTop + chatPanel.offsetHeight + PANEL_DOCK_GAP}px`;
   linkPanels(toolbox, chatPanel);
   linkPanels(chatPanel, artistsPanel);
