@@ -439,8 +439,11 @@ function connect() {
       return;
     }
 
-    if (msg.type === "board-cleared") {
-      clearBoardLocal();
+    if (msg.type === "pixels-updated" && Array.isArray(msg.pixels)) {
+      msg.pixels.forEach((pixel) => {
+        applyPixel(Number(pixel.x), Number(pixel.y), pixel.color);
+      });
+      return;
     }
   });
 
@@ -543,7 +546,6 @@ eraserBtn.addEventListener("click", () => {
 });
 
 clearBtn.addEventListener("click", () => {
-  clearBoardLocal();
   send({ type: "clear-board" });
 });
 
