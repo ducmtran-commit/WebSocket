@@ -84,8 +84,8 @@ function broadcastPixelsUpdated(pixels) {
   });
 }
 
-function addChat(author, text) {
-  state.chat.push({ author, text, at: Date.now() });
+function addChat(author, text, authorId = null) {
+  state.chat.push({ author, authorId, text, at: Date.now() });
   if (state.chat.length > 30) state.chat.shift();
 }
 
@@ -212,7 +212,7 @@ wss.on("connection", (ws) => {
     if (msg.type === "chat") {
       const text = typeof msg.text === "string" ? msg.text.trim().slice(0, 120) : "";
       if (!text) return;
-      addChat(current.name, text);
+      addChat(current.name, text, current.id);
       broadcastChat();
     }
   });
