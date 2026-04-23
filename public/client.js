@@ -236,7 +236,7 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
-function startPanelDrag(panel, event, startedOnFab = false) {
+function startPanelDrag(panel, event, startedOnFab = false, detachFromGroup = false) {
   if (!(panel instanceof HTMLElement)) return;
   activeDraggedPanel = panel;
   panelDragMoved = false;
@@ -246,7 +246,12 @@ function startPanelDrag(panel, event, startedOnFab = false) {
   const rect = panel.getBoundingClientRect();
   panelDragOffsetX = event.clientX - rect.left;
   panelDragOffsetY = event.clientY - rect.top;
-  activeDragGroup = getLinkedPanelGroup(panel);
+  if (detachFromGroup) {
+    unlinkPanel(panel);
+    activeDragGroup = [panel];
+  } else {
+    activeDragGroup = getLinkedPanelGroup(panel);
+  }
   panel.classList.add("is-dragging");
 }
 
@@ -361,6 +366,19 @@ function linkPanels(a, b) {
   panelLinks.get(b).add(a);
 }
 
+function unlinkPanel(panel) {
+  if (!(panel instanceof HTMLElement)) return;
+  const links = panelLinks.get(panel);
+  if (!links) return;
+  links.forEach((neighbor) => {
+    const neighborLinks = panelLinks.get(neighbor);
+    if (neighborLinks) {
+      neighborLinks.delete(panel);
+    }
+  });
+  panelLinks.set(panel, new Set());
+}
+
 function getLinkedPanelGroup(start) {
   if (!(start instanceof HTMLElement)) return [];
   const visited = new Set([start]);
@@ -383,40 +401,49 @@ function attemptSnapConnections(activePanel) {
   if (!(activePanel instanceof HTMLElement)) return;
   const SNAP_DISTANCE = 24;
   const activeRect = activePanel.getBoundingClientRect();
+  let bestSnap = null;
 
-  panelArray().forEach((candidate) => {
-    if (candidate === activePanel) return;
+  for (const candidate of panelArray()) {
+    if (candidate === activePanel) continue;
     const rect = candidate.getBoundingClientRect();
+    const verticalOverlap = Math.min(activeRect.bottom, rect.bottom) - Math.max(activeRect.top, rect.top);
+    const horizontalOverlap = Math.min(activeRect.right, rect.right) - Math.max(activeRect.left, rect.left);
 
     const canSnapRight = Math.abs(activeRect.right - rect.left) <= SNAP_DISTANCE;
     const canSnapLeft = Math.abs(activeRect.left - rect.right) <= SNAP_DISTANCE;
     const canSnapBottom = Math.abs(activeRect.bottom - rect.top) <= SNAP_DISTANCE;
     const canSnapTop = Math.abs(activeRect.top - rect.bottom) <= SNAP_DISTANCE;
 
-    if (canSnapRight) {
-      const deltaX = rect.left - activeRect.right;
-      movePanelBy(activePanel, deltaX, 0);
-      linkPanels(activePanel, candidate);
-      return;
+    if (canSnapRight && verticalOverlap > 12) {
+      const distance = Math.abs(activeRect.right - rect.left);
+      if (!bestSnap || distance < bestSnap.distance) {
+        bestSnap = { candidate, deltaX: rect.left - activeRect.right, deltaY: 0, distance };
+      }
     }
-    if (canSnapLeft) {
-      const deltaX = rect.right - activeRect.left;
-      movePanelBy(activePanel, deltaX, 0);
-      linkPanels(activePanel, candidate);
-      return;
+    if (canSnapLeft && verticalOverlap > 12) {
+      const distance = Math.abs(activeRect.left - rect.right);
+      if (!bestSnap || distance < bestSnap.distance) {
+        bestSnap = { candidate, deltaX: rect.right - activeRect.left, deltaY: 0, distance };
+      }
     }
-    if (canSnapBottom) {
-      const deltaY = rect.top - activeRect.bottom;
-      movePanelBy(activePanel, 0, deltaY);
-      linkPanels(activePanel, candidate);
-      return;
+    if (canSnapBottom && horizontalOverlap > 12) {
+      const distance = Math.abs(activeRect.bottom - rect.top);
+      if (!bestSnap || distance < bestSnap.distance) {
+        bestSnap = { candidate, deltaX: 0, deltaY: rect.top - activeRect.bottom, distance };
+      }
     }
-    if (canSnapTop) {
-      const deltaY = rect.bottom - activeRect.top;
-      movePanelBy(activePanel, 0, deltaY);
-      linkPanels(activePanel, candidate);
+    if (canSnapTop && horizontalOverlap > 12) {
+      const distance = Math.abs(activeRect.top - rect.bottom);
+      if (!bestSnap || distance < bestSnap.distance) {
+        bestSnap = { candidate, deltaX: 0, deltaY: rect.bottom - activeRect.top, distance };
+      }
     }
-  });
+  }
+
+  if (bestSnap) {
+    movePanelBy(activePanel, bestSnap.deltaX, bestSnap.deltaY);
+    linkPanels(activePanel, bestSnap.candidate);
+  }
 }
 
 function toggleToolboxMinimized() {
@@ -448,7 +475,7 @@ function setupPanelInteractions(panel, handle, fab, toggleMinimized) {
       const isPanelMinimized = panel.classList.contains("minimized");
       if (isPanelMinimized) return;
       event.preventDefault();
-      startPanelDrag(panel, event, false);
+      startPanelDrag(panel, event, false, event.shiftKey);
     });
   }
 
@@ -465,7 +492,7 @@ function setupPanelInteractions(panel, handle, fab, toggleMinimized) {
       if (event.target instanceof HTMLElement && event.target.closest("button")) return;
       if (event.button !== 0) return;
       event.preventDefault();
-      startPanelDrag(panel, event, false);
+      startPanelDrag(panel, event, false, event.shiftKey);
     });
   }
 
@@ -473,7 +500,7 @@ function setupPanelInteractions(panel, handle, fab, toggleMinimized) {
     fab.addEventListener("mousedown", (event) => {
       if (event.button !== 0) return;
       event.preventDefault();
-      startPanelDrag(panel, event, true);
+      startPanelDrag(panel, event, true, true);
     });
     fab.addEventListener("click", () => {
       if (dragStartedOnFab && panelDragMoved) {
