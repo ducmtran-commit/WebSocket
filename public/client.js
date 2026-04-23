@@ -17,22 +17,13 @@ const chatBox = document.getElementById("chatBox");
 const chatInput = document.getElementById("chatInput");
 const sendChatBtn = document.getElementById("sendChatBtn");
 const colorHistory = document.getElementById("colorHistory");
-const toolbox = document.getElementById("toolboxPanel");
-const toolboxHandle = document.getElementById("toolboxHandle");
-const toolboxFab = document.getElementById("toolboxFab");
+const workspacePanel = document.getElementById("workspacePanel");
+const workspaceHandle = document.getElementById("workspaceHandle");
+const workspaceScroll = document.getElementById("workspaceScroll");
+const workspaceNav = document.querySelector(".workspace-nav");
+const navScrollUp = document.getElementById("navScrollUp");
+const navScrollDown = document.getElementById("navScrollDown");
 const autoHideBtn = document.getElementById("autoHideBtn");
-const chatPanel = document.getElementById("chatPanel");
-const chatHandle = document.getElementById("chatHandle");
-const chatFab = document.getElementById("chatFab");
-const artistsPanel = document.getElementById("artistsPanel");
-const artistsHandle = document.getElementById("artistsHandle");
-const artistsFab = document.getElementById("artistsFab");
-const undockToolboxBtn = document.getElementById("undockToolboxBtn");
-const undockChatBtn = document.getElementById("undockChatBtn");
-const undockArtistsBtn = document.getElementById("undockArtistsBtn");
-const groupFab = document.getElementById("groupFab");
-const toggleChatBtn = document.getElementById("toggleChatBtn");
-const toggleArtistsBtn = document.getElementById("toggleArtistsBtn");
 
 let ws;
 let reconnectAttempts = 0;
@@ -54,26 +45,10 @@ let panStartY = 0;
 let panScrollLeft = 0;
 let panScrollTop = 0;
 let isSpaceHeld = false;
-let isToolboxMinimized = false;
-let isChatMinimized = false;
-let isArtistsMinimized = false;
 let shouldAutoHideToolbox = true;
-let activeDraggedPanel = null;
-let panelDragOffsetX = 0;
-let panelDragOffsetY = 0;
-let panelDragMoved = false;
-let dragStartedOnFab = false;
-let dragLastX = 0;
-let dragLastY = 0;
-let activeDragGroup = [];
-const panelLinks = new Map();
-const PANEL_DOCK_GAP = 10;
-let isLayoutCustomized = false;
-let isGroupFabDragging = false;
-let groupFabMoved = false;
-let groupFabOffsetX = 0;
-let groupFabOffsetY = 0;
-let hideGroupFabForRearrange = false;
+let workspaceDragging = false;
+let workspaceDragLastX = 0;
+let workspaceDragLastY = 0;
 const COLOR_HISTORY_KEY = "pixel-board-color-history";
 const MAX_COLOR_HISTORY = 10;
 let recentColors = [];
@@ -249,132 +224,33 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
-function startPanelDrag(panel, event, startedOnFab = false, detachFromGroup = false) {
-  if (!(panel instanceof HTMLElement)) return;
-  activeDraggedPanel = panel;
-  panelDragMoved = false;
-  dragStartedOnFab = startedOnFab;
-  dragLastX = event.clientX;
-  dragLastY = event.clientY;
-  const rect = panel.getBoundingClientRect();
-  panelDragOffsetX = event.clientX - rect.left;
-  panelDragOffsetY = event.clientY - rect.top;
-  if (detachFromGroup) {
-    unlinkPanel(panel);
-    activeDragGroup = [panel];
-  } else {
-    activeDragGroup = getLinkedPanelGroup(panel);
-  }
-  panel.classList.add("is-dragging");
-}
-
 function syncToolboxButtons() {
   if (autoHideBtn instanceof HTMLElement) {
     autoHideBtn.textContent = `Auto-hide: ${shouldAutoHideToolbox ? "On" : "Off"}`;
   }
-  if (toolboxFab instanceof HTMLElement) {
-    toolboxFab.setAttribute("aria-label", isToolboxMinimized ? "Open toolbox" : "Toolbox");
-  }
-  if (chatFab instanceof HTMLElement) {
-    chatFab.setAttribute("aria-label", isChatMinimized ? "Open chat" : "Chat");
-  }
-  if (artistsFab instanceof HTMLElement) {
-    artistsFab.setAttribute("aria-label", isArtistsMinimized ? "Open artists" : "Artists");
-  }
-  if (toggleChatBtn instanceof HTMLElement) {
-    toggleChatBtn.textContent = isChatMinimized ? "+" : "_";
-    toggleChatBtn.title = isChatMinimized ? "Expand chat" : "Minimize chat";
-  }
-  if (toggleArtistsBtn instanceof HTMLElement) {
-    toggleArtistsBtn.textContent = isArtistsMinimized ? "+" : "_";
-    toggleArtistsBtn.title = isArtistsMinimized ? "Expand artists" : "Minimize artists";
-  }
 }
 
-function markLayoutCustomized() {
-  if (isLayoutCustomized) return;
-  isLayoutCustomized = true;
-  document.body.classList.add("customized-layout");
-  updateGroupFabVisibility();
+function startWorkspaceDrag(event) {
+  if (!(workspacePanel instanceof HTMLElement)) return;
+  workspaceDragging = true;
+  workspaceDragLastX = event.clientX;
+  workspaceDragLastY = event.clientY;
+  workspacePanel.classList.add("is-dragging");
 }
 
-function markPanelsRearranged() {
-  hideGroupFabForRearrange = true;
-  updateGroupFabVisibility();
+function dragWorkspace(event) {
+  if (!workspaceDragging || !(workspacePanel instanceof HTMLElement)) return;
+  const deltaX = event.clientX - workspaceDragLastX;
+  const deltaY = event.clientY - workspaceDragLastY;
+  workspaceDragLastX = event.clientX;
+  workspaceDragLastY = event.clientY;
+  movePanelBy(workspacePanel, deltaX, deltaY);
 }
 
-function setToolboxMinimized(nextState) {
-  if (nextState) {
-    markLayoutCustomized();
-  }
-  isToolboxMinimized = nextState;
-  if (toolbox instanceof HTMLElement) {
-    toolbox.classList.toggle("minimized", isToolboxMinimized);
-    if (isToolboxMinimized) {
-      toolbox.classList.remove("auto-hidden");
-    }
-  }
-  reflowLinkedOpenPanels(toolbox);
-  syncToolboxButtons();
-}
-
-function setChatMinimized(nextState) {
-  if (nextState) {
-    markLayoutCustomized();
-  }
-  isChatMinimized = nextState;
-  if (chatPanel instanceof HTMLElement) {
-    chatPanel.classList.toggle("minimized", isChatMinimized);
-  }
-  reflowLinkedOpenPanels(chatPanel);
-  syncToolboxButtons();
-}
-
-function setArtistsMinimized(nextState) {
-  if (nextState) {
-    markLayoutCustomized();
-  }
-  isArtistsMinimized = nextState;
-  if (artistsPanel instanceof HTMLElement) {
-    artistsPanel.classList.toggle("minimized", isArtistsMinimized);
-  }
-  reflowLinkedOpenPanels(artistsPanel);
-  syncToolboxButtons();
-}
-
-function dragActivePanel(event) {
-  if (!(activeDraggedPanel instanceof HTMLElement)) return;
-  panelDragMoved = true;
-  markLayoutCustomized();
-  markPanelsRearranged();
-  const deltaX = event.clientX - dragLastX;
-  const deltaY = event.clientY - dragLastY;
-  dragLastX = event.clientX;
-  dragLastY = event.clientY;
-
-  const group = activeDragGroup.length > 0 ? activeDragGroup : [activeDraggedPanel];
-  group.forEach((panel) => {
-    movePanelBy(panel, deltaX, deltaY);
-  });
-}
-
-function stopPanelDrag() {
-  if (!(activeDraggedPanel instanceof HTMLElement)) return;
-  activeDraggedPanel.classList.remove("is-dragging");
-  attemptSnapConnections(activeDraggedPanel);
-  activeDraggedPanel = null;
-  activeDragGroup = [];
-}
-
-function fitPanelIntoViewport(panel) {
-  if (!(panel instanceof HTMLElement)) return;
-  const maxLeft = Math.max(0, window.innerWidth - panel.offsetWidth);
-  const maxTop = Math.max(0, window.innerHeight - panel.offsetHeight);
-  const currentLeft = panel.offsetLeft;
-  const currentTop = panel.offsetTop;
-  panel.style.left = `${clamp(currentLeft, 0, maxLeft)}px`;
-  panel.style.top = `${clamp(currentTop, 0, maxTop)}px`;
-  panel.style.right = "auto";
+function stopWorkspaceDrag() {
+  if (!(workspacePanel instanceof HTMLElement)) return;
+  workspaceDragging = false;
+  workspacePanel.classList.remove("is-dragging");
 }
 
 function centerBoardViewport() {
@@ -382,10 +258,6 @@ function centerBoardViewport() {
   const maxTop = Math.max(0, boardViewport.scrollHeight - boardViewport.clientHeight);
   boardViewport.scrollLeft = Math.round(maxLeft / 2);
   boardViewport.scrollTop = Math.round(maxTop / 2);
-}
-
-function panelArray() {
-  return [toolbox, chatPanel, artistsPanel].filter((panel) => panel instanceof HTMLElement);
 }
 
 function movePanelBy(panel, deltaX, deltaY) {
@@ -399,349 +271,69 @@ function movePanelBy(panel, deltaX, deltaY) {
   panel.style.right = "auto";
 }
 
-function ensurePanelLinkEntry(panel) {
-  if (!panelLinks.has(panel)) {
-    panelLinks.set(panel, new Set());
-  }
-}
-
-function linkPanels(a, b) {
-  if (!(a instanceof HTMLElement) || !(b instanceof HTMLElement) || a === b) return;
-  ensurePanelLinkEntry(a);
-  ensurePanelLinkEntry(b);
-  panelLinks.get(a).add(b);
-  panelLinks.get(b).add(a);
-  updateGroupFabVisibility();
-}
-
-function unlinkPanel(panel) {
-  if (!(panel instanceof HTMLElement)) return;
-  markLayoutCustomized();
-  markPanelsRearranged();
-  const links = panelLinks.get(panel);
-  if (!links) return;
-  links.forEach((neighbor) => {
-    const neighborLinks = panelLinks.get(neighbor);
-    if (neighborLinks) {
-      neighborLinks.delete(panel);
-    }
-  });
-  panelLinks.set(panel, new Set());
-  updateGroupFabVisibility();
-}
-
-function hasAnyLinkedPanels() {
-  for (const panel of panelArray()) {
-    const links = panelLinks.get(panel);
-    if (links && links.size > 0) return true;
-  }
-  return false;
-}
-
-function updateGroupFabVisibility() {
-  if (!(groupFab instanceof HTMLElement)) return;
-  const shouldShow = hasAnyLinkedPanels() && isLayoutCustomized && !hideGroupFabForRearrange;
-  groupFab.classList.toggle("visible", shouldShow);
-}
-
-function getLinkedPanelGroup(start) {
-  if (!(start instanceof HTMLElement)) return [];
-  const visited = new Set([start]);
-  const queue = [start];
-  while (queue.length > 0) {
-    const current = queue.shift();
-    const neighbors = panelLinks.get(current);
-    if (!neighbors) continue;
-    neighbors.forEach((next) => {
-      if (!visited.has(next)) {
-        visited.add(next);
-        queue.push(next);
-      }
-    });
-  }
-  return Array.from(visited);
-}
-
-function reflowLinkedOpenPanels(sourcePanel) {
-  if (!(sourcePanel instanceof HTMLElement)) return;
-  const group = getLinkedPanelGroup(sourcePanel).filter(
-    (panel) => panel instanceof HTMLElement && !panel.classList.contains("minimized")
+function scrollWorkspaceBy(deltaY) {
+  if (!(workspaceScroll instanceof HTMLElement)) return;
+  workspaceScroll.scrollTop = clamp(
+    workspaceScroll.scrollTop + deltaY,
+    0,
+    Math.max(0, workspaceScroll.scrollHeight - workspaceScroll.clientHeight)
   );
-  if (group.length < 2) return;
-
-  const COLUMN_THRESHOLD = 80;
-  const columns = [];
-  const sortedByLeft = [...group].sort((a, b) => a.offsetLeft - b.offsetLeft);
-  sortedByLeft.forEach((panel) => {
-    const col = columns.find((item) => Math.abs(item.left - panel.offsetLeft) <= COLUMN_THRESHOLD);
-    if (col) {
-      col.panels.push(panel);
-      col.left = Math.round((col.left + panel.offsetLeft) / 2);
-    } else {
-      columns.push({ left: panel.offsetLeft, panels: [panel] });
-    }
-  });
-
-  columns.forEach((column) => {
-    const panels = column.panels.sort((a, b) => a.offsetTop - b.offsetTop);
-    if (panels.length < 2) return;
-    let currentTop = panels[0].offsetTop;
-    panels.forEach((panel, index) => {
-      if (index === 0) {
-        currentTop = panel.offsetTop + panel.offsetHeight + PANEL_DOCK_GAP;
-        return;
-      }
-      panel.style.top = `${currentTop}px`;
-      panel.style.right = "auto";
-      currentTop += panel.offsetHeight + PANEL_DOCK_GAP;
-    });
-  });
 }
 
-function attemptSnapConnections(activePanel) {
-  if (!(activePanel instanceof HTMLElement)) return;
-  const SNAP_DISTANCE = 34;
-  const activeRect = activePanel.getBoundingClientRect();
-  let bestSnap = null;
-
-  for (const candidate of panelArray()) {
-    if (candidate === activePanel) continue;
-    const rect = candidate.getBoundingClientRect();
-    const verticalOverlap = Math.min(activeRect.bottom, rect.bottom) - Math.max(activeRect.top, rect.top);
-    const horizontalOverlap = Math.min(activeRect.right, rect.right) - Math.max(activeRect.left, rect.left);
-
-    const canSnapRight = Math.abs(activeRect.right - rect.left) <= SNAP_DISTANCE;
-    const canSnapLeft = Math.abs(activeRect.left - rect.right) <= SNAP_DISTANCE;
-    const canSnapBottom = Math.abs(activeRect.bottom - rect.top) <= SNAP_DISTANCE;
-    const canSnapTop = Math.abs(activeRect.top - rect.bottom) <= SNAP_DISTANCE;
-
-    if (canSnapRight && verticalOverlap > 12) {
-      const distance = Math.abs(activeRect.right - rect.left);
-      if (!bestSnap || distance < bestSnap.distance) {
-        bestSnap = {
-          candidate,
-          deltaX: rect.left - activeRect.right - PANEL_DOCK_GAP,
-          deltaY: 0,
-          distance,
-        };
-      }
-    }
-    if (canSnapLeft && verticalOverlap > 12) {
-      const distance = Math.abs(activeRect.left - rect.right);
-      if (!bestSnap || distance < bestSnap.distance) {
-        bestSnap = {
-          candidate,
-          deltaX: rect.right - activeRect.left + PANEL_DOCK_GAP,
-          deltaY: 0,
-          distance,
-        };
-      }
-    }
-    if (canSnapBottom && horizontalOverlap > 12) {
-      const distance = Math.abs(activeRect.bottom - rect.top);
-      if (!bestSnap || distance < bestSnap.distance) {
-        bestSnap = {
-          candidate,
-          deltaX: 0,
-          deltaY: rect.top - activeRect.bottom - PANEL_DOCK_GAP,
-          distance,
-        };
-      }
-    }
-    if (canSnapTop && horizontalOverlap > 12) {
-      const distance = Math.abs(activeRect.top - rect.bottom);
-      if (!bestSnap || distance < bestSnap.distance) {
-        bestSnap = {
-          candidate,
-          deltaX: 0,
-          deltaY: rect.bottom - activeRect.top + PANEL_DOCK_GAP,
-          distance,
-        };
-      }
-    }
-  }
-
-  if (bestSnap) {
-    movePanelBy(activePanel, bestSnap.deltaX, bestSnap.deltaY);
-    linkPanels(activePanel, bestSnap.candidate);
-  }
+function jumpToSection(sectionId) {
+  const el = document.getElementById(sectionId);
+  if (!(el instanceof HTMLElement) || !(workspaceScroll instanceof HTMLElement)) return;
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function toggleToolboxMinimized() {
-  setToolboxMinimized(!isToolboxMinimized);
-}
-
-function toggleChatMinimized() {
-  setChatMinimized(!isChatMinimized);
-}
-
-function toggleArtistsMinimized() {
-  setArtistsMinimized(!isArtistsMinimized);
-}
-
-function setupPanelInteractions(panel, handle, fab, toggleMinimized) {
-  if (panel instanceof HTMLElement) {
-    panel.addEventListener("contextmenu", (event) => {
-      event.preventDefault();
-      unlinkPanel(panel);
-    });
-
-    panel.addEventListener("mousedown", (event) => {
-      if (event.button !== 0) return;
-      const target = event.target;
-      if (!(target instanceof HTMLElement)) return;
-      const isInteractive =
-        Boolean(target.closest("button")) ||
-        Boolean(target.closest("input")) ||
-        Boolean(target.closest("textarea")) ||
-        Boolean(target.closest("select")) ||
-        target.isContentEditable;
-      if (isInteractive) return;
-
-      const isPanelMinimized = panel.classList.contains("minimized");
-      if (isPanelMinimized) return;
-      event.preventDefault();
-      startPanelDrag(panel, event, false, event.shiftKey);
-    });
-  }
-
-  if (panel instanceof HTMLElement) {
-    panel.addEventListener("dblclick", (event) => {
-      if (event.button !== 0) return;
-      event.preventDefault();
-      toggleMinimized();
-    });
-  }
-
-  if (handle instanceof HTMLElement) {
-    handle.addEventListener("mousedown", (event) => {
-      if (event.target instanceof HTMLElement && event.target.closest("button")) return;
-      if (event.button !== 0) return;
-      event.preventDefault();
-      startPanelDrag(panel, event, false, event.shiftKey);
-    });
-  }
-
-  if (fab instanceof HTMLElement) {
-    fab.addEventListener("mousedown", (event) => {
-      if (event.button !== 0) return;
-      event.preventDefault();
-      startPanelDrag(panel, event, true, true);
-    });
-    fab.addEventListener("click", () => {
-      if (dragStartedOnFab && panelDragMoved) {
-        panelDragMoved = false;
-        dragStartedOnFab = false;
-        return;
-      }
-      dragStartedOnFab = false;
-      toggleMinimized();
-    });
-  }
-}
-
-setupPanelInteractions(toolbox, toolboxHandle, toolboxFab, toggleToolboxMinimized);
-setupPanelInteractions(chatPanel, chatHandle, chatFab, toggleChatMinimized);
-setupPanelInteractions(artistsPanel, artistsHandle, artistsFab, toggleArtistsMinimized);
-
-if (toolbox instanceof HTMLElement) {
-  toolbox.style.left = "16px";
-  toolbox.style.top = "16px";
-  toolbox.style.right = "auto";
-}
-
-if (chatPanel instanceof HTMLElement) {
-  chatPanel.style.left = `${Math.max(16, window.innerWidth - 68)}px`;
-  chatPanel.style.top = "88px";
-  chatPanel.style.right = "auto";
-}
-
-if (artistsPanel instanceof HTMLElement) {
-  artistsPanel.style.left = `${Math.max(16, window.innerWidth - 84)}px`;
-  artistsPanel.style.top = `${Math.max(16, window.innerHeight - 84)}px`;
-  artistsPanel.style.right = "auto";
-}
-
-if (undockToolboxBtn instanceof HTMLElement) {
-  undockToolboxBtn.addEventListener("click", (event) => {
-    event.stopPropagation();
-    unlinkPanel(toolbox);
-  });
-}
-
-if (undockChatBtn instanceof HTMLElement) {
-  undockChatBtn.addEventListener("click", (event) => {
-    event.stopPropagation();
-    unlinkPanel(chatPanel);
-  });
-}
-
-if (undockArtistsBtn instanceof HTMLElement) {
-  undockArtistsBtn.addEventListener("click", (event) => {
-    event.stopPropagation();
-    unlinkPanel(artistsPanel);
-  });
-}
-
-if (toggleChatBtn instanceof HTMLElement) {
-  toggleChatBtn.addEventListener("click", (event) => {
-    event.stopPropagation();
-    toggleChatMinimized();
-  });
-}
-
-if (toggleArtistsBtn instanceof HTMLElement) {
-  toggleArtistsBtn.addEventListener("click", (event) => {
-    event.stopPropagation();
-    toggleArtistsMinimized();
-  });
-}
-
-if (groupFab instanceof HTMLElement) {
-  groupFab.addEventListener("mousedown", (event) => {
+if (workspaceHandle instanceof HTMLElement) {
+  workspaceHandle.addEventListener("mousedown", (event) => {
+    if (event.target instanceof HTMLElement && event.target.closest("button")) return;
     if (event.button !== 0) return;
-    isGroupFabDragging = true;
-    groupFabMoved = false;
-    const rect = groupFab.getBoundingClientRect();
-    groupFabOffsetX = event.clientX - rect.left;
-    groupFabOffsetY = event.clientY - rect.top;
     event.preventDefault();
+    startWorkspaceDrag(event);
   });
+}
 
-  groupFab.addEventListener("click", () => {
-    if (groupFabMoved) {
-      groupFabMoved = false;
-      return;
-    }
-    const shouldOpenAll = isToolboxMinimized || isChatMinimized || isArtistsMinimized;
-    setToolboxMinimized(!shouldOpenAll);
-    setChatMinimized(!shouldOpenAll);
-    setArtistsMinimized(!shouldOpenAll);
+if (workspaceNav instanceof HTMLElement) {
+  workspaceNav.addEventListener("mousedown", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (target.closest("button")) return;
+    if (event.button !== 0) return;
+    event.preventDefault();
+    startWorkspaceDrag(event);
   });
+}
+
+if (navScrollUp instanceof HTMLElement) {
+  navScrollUp.addEventListener("click", () => scrollWorkspaceBy(-160));
+}
+
+if (navScrollDown instanceof HTMLElement) {
+  navScrollDown.addEventListener("click", () => scrollWorkspaceBy(160));
+}
+
+document.querySelectorAll(".nav-jump").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const id = btn.getAttribute("data-target");
+    if (id) jumpToSection(id);
+  });
+});
+
+if (workspacePanel instanceof HTMLElement) {
+  workspacePanel.style.left = "16px";
+  workspacePanel.style.top = "16px";
+  workspacePanel.style.right = "auto";
 }
 
 function setToolboxDrawingHidden(shouldHide) {
-  if (!(toolbox instanceof HTMLElement)) return;
-  const linkedPanels = getLinkedPanelGroup(toolbox);
-  const targets = linkedPanels.length > 0 ? linkedPanels : [toolbox];
-
+  if (!(workspacePanel instanceof HTMLElement)) return;
   if (!shouldAutoHideToolbox) {
-    targets.forEach((panel) => {
-      if (panel instanceof HTMLElement) {
-        panel.classList.remove("auto-hidden");
-      }
-    });
+    workspacePanel.classList.remove("auto-hidden");
     return;
   }
-
-  targets.forEach((panel) => {
-    if (!(panel instanceof HTMLElement)) return;
-    if (panel.classList.contains("minimized")) {
-      panel.classList.remove("auto-hidden");
-      return;
-    }
-    panel.classList.toggle("auto-hidden", shouldHide);
-  });
+  workspacePanel.classList.toggle("auto-hidden", shouldHide);
 }
 
 function renderChat(chat) {
@@ -912,10 +504,7 @@ board.addEventListener("mouseover", (event) => {
 });
 
 window.addEventListener("mouseup", () => {
-  stopPanelDrag();
-  if (isGroupFabDragging) {
-    isGroupFabDragging = false;
-  }
+  stopWorkspaceDrag();
   if (isPanning) {
     isPanning = false;
     boardViewport.classList.remove("is-panning");
@@ -930,17 +519,7 @@ boardViewport.addEventListener("mousedown", (event) => {
 });
 
 window.addEventListener("mousemove", (event) => {
-  dragActivePanel(event);
-  if (isGroupFabDragging && groupFab instanceof HTMLElement) {
-    const maxLeft = window.innerWidth - groupFab.offsetWidth;
-    const maxTop = window.innerHeight - groupFab.offsetHeight;
-    const nextLeft = clamp(event.clientX - groupFabOffsetX, 0, Math.max(0, maxLeft));
-    const nextTop = clamp(event.clientY - groupFabOffsetY, 0, Math.max(0, maxTop));
-    groupFab.style.left = `${nextLeft}px`;
-    groupFab.style.top = `${nextTop}px`;
-    groupFab.style.transform = "none";
-    groupFabMoved = true;
-  }
+  dragWorkspace(event);
   if (isPainting && (event.buttons & 1) !== 1) {
     stopPainting();
   }
@@ -1056,21 +635,7 @@ window.addEventListener("keyup", (event) => {
 
 renderState(latestState);
 setZoom(0.9);
-setToolboxMinimized(true);
-setChatMinimized(true);
-setArtistsMinimized(true);
-if (toolbox instanceof HTMLElement && chatPanel instanceof HTMLElement && artistsPanel instanceof HTMLElement) {
-  toolbox.style.left = "24px";
-  toolbox.style.top = "24px";
-  chatPanel.style.left = toolbox.style.left;
-  chatPanel.style.top = `${toolbox.offsetTop + toolbox.offsetHeight + PANEL_DOCK_GAP}px`;
-  artistsPanel.style.left = toolbox.style.left;
-  artistsPanel.style.top = `${chatPanel.offsetTop + chatPanel.offsetHeight + PANEL_DOCK_GAP}px`;
-  linkPanels(toolbox, chatPanel);
-  linkPanels(chatPanel, artistsPanel);
-}
 syncToolboxButtons();
-updateGroupFabVisibility();
 loadColorHistory();
 addColorToHistory(colorInput.value);
 connect();
