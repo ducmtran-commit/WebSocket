@@ -240,6 +240,25 @@ function syncWorkspaceCollapseButton() {
   workspaceCollapseBtn.setAttribute("aria-label", collapsed ? "Expand workspace" : "Collapse workspace");
 }
 
+function toggleWorkspaceUiCollapsed() {
+  if (!(workspacePanel instanceof HTMLElement)) return;
+  stopSectionReorder();
+  workspacePanel.classList.toggle("workspace-ui-collapsed");
+  syncWorkspaceCollapseButton();
+}
+
+function isWorkspaceDblclickToggleTarget(target) {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.closest("button")) return false;
+  if (target.closest("input")) return false;
+  if (target.closest("textarea")) return false;
+  if (target.closest("select")) return false;
+  if (target.closest("a")) return false;
+  if (target.closest("label")) return false;
+  if (target.closest(".chat-box")) return false;
+  return true;
+}
+
 function startWorkspaceDrag(event) {
   if (!(workspacePanel instanceof HTMLElement)) return;
   workspaceDragging = true;
@@ -420,14 +439,16 @@ if (workspaceScroll instanceof HTMLElement) {
 if (workspaceCollapseBtn instanceof HTMLElement) {
   workspaceCollapseBtn.addEventListener("click", (event) => {
     event.stopPropagation();
-    if (!(workspacePanel instanceof HTMLElement)) return;
-    stopSectionReorder();
-    workspacePanel.classList.toggle("workspace-ui-collapsed");
-    syncWorkspaceCollapseButton();
+    toggleWorkspaceUiCollapsed();
   });
 }
 
 if (workspacePanel instanceof HTMLElement) {
+  workspacePanel.addEventListener("dblclick", (event) => {
+    if (!isWorkspaceDblclickToggleTarget(event.target)) return;
+    event.preventDefault();
+    toggleWorkspaceUiCollapsed();
+  });
   workspacePanel.style.left = "16px";
   workspacePanel.style.top = "16px";
   workspacePanel.style.right = "auto";
