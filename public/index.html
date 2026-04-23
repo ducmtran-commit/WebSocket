@@ -8,7 +8,7 @@
   </head>
   <body>
     <main class="layout">
-      <section class="left">
+      <section id="toolboxPanel" class="left floating-panel">
         <button id="toolboxFab" class="toolbox-fab" type="button" aria-label="Open toolbox">🎨</button>
         <div id="toolboxHandle" class="left-drag-handle">
           <span class="drag-title">Drag Toolbox</span>
@@ -44,7 +44,15 @@
           <p id="statusText">Status: connecting...</p>
           <p id="playersText">Artists online: 0</p>
           </div>
+        </div>
+      </section>
 
+      <section id="chatPanel" class="chat-panel floating-panel">
+        <button id="chatFab" class="toolbox-fab" type="button" aria-label="Open chat">💬</button>
+        <div id="chatHandle" class="left-drag-handle">
+          <span class="drag-title">Drag Chat</span>
+        </div>
+        <div class="chat-content">
           <div class="panel">
             <h2>Chat</h2>
             <div id="chatBox" class="chat-box"></div>
