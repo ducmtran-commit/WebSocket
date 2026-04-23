@@ -20,7 +20,8 @@ const colorHistory = document.getElementById("colorHistory");
 const workspacePanel = document.getElementById("workspacePanel");
 const workspaceHandle = document.getElementById("workspaceHandle");
 const workspaceScroll = document.getElementById("workspaceScroll");
-const workspaceNav = document.querySelector(".workspace-nav");
+const workspaceSectionStack = document.getElementById("workspaceSectionStack");
+const workspaceCollapseBtn = document.getElementById("workspaceCollapseBtn");
 const navScrollUp = document.getElementById("navScrollUp");
 const navScrollDown = document.getElementById("navScrollDown");
 const autoHideBtn = document.getElementById("autoHideBtn");
@@ -231,6 +232,14 @@ function syncToolboxButtons() {
   }
 }
 
+function syncWorkspaceCollapseButton() {
+  if (!(workspaceCollapseBtn instanceof HTMLElement) || !(workspacePanel instanceof HTMLElement)) return;
+  const collapsed = workspacePanel.classList.contains("workspace-ui-collapsed");
+  workspaceCollapseBtn.textContent = collapsed ? "Expand" : "Collapse";
+  workspaceCollapseBtn.setAttribute("aria-expanded", String(!collapsed));
+  workspaceCollapseBtn.setAttribute("aria-label", collapsed ? "Expand workspace" : "Collapse workspace");
+}
+
 function startWorkspaceDrag(event) {
   if (!(workspacePanel instanceof HTMLElement)) return;
   workspaceDragging = true;
@@ -283,26 +292,32 @@ function scrollWorkspaceBy(deltaY) {
 
 function jumpToSection(sectionId) {
   const el = document.getElementById(sectionId);
-  if (!(el instanceof HTMLElement) || !(workspaceScroll instanceof HTMLElement)) return;
-  el.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (!(el instanceof HTMLElement)) return;
+  const row = el.closest(".workspace-section-row");
+  const target = row instanceof HTMLElement ? row : el;
+  target.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 function startSectionReorder(section, clientY) {
-  if (!(workspaceScroll instanceof HTMLElement)) return;
-  const rect = section.getBoundingClientRect();
+  const row = section.closest(".workspace-section-row");
+  const stack = workspaceSectionStack;
+  if (!(row instanceof HTMLElement) || !(stack instanceof HTMLElement)) return;
+  const rect = row.getBoundingClientRect();
   const placeholder = document.createElement("div");
-  placeholder.className = "section-reorder-placeholder";
-  placeholder.style.height = `${rect.height}px`;
-  workspaceScroll.insertBefore(placeholder, section);
-  section.classList.add("is-section-dragging");
-  section.style.position = "fixed";
-  section.style.left = `${rect.left}px`;
-  section.style.top = `${rect.top}px`;
-  section.style.width = `${rect.width}px`;
-  section.style.zIndex = "60";
-  section.style.marginBottom = "0";
+  placeholder.className = "workspace-align-row workspace-section-placeholder";
+  placeholder.innerHTML =
+    '<div class="workspace-nav-cell" aria-hidden="true"></div><div class="workspace-content-cell"><div class="workspace-section-placeholder-dash" aria-hidden="true"></div></div>';
+  placeholder.style.minHeight = `${rect.height}px`;
+  stack.insertBefore(placeholder, row);
+  row.classList.add("is-section-dragging");
+  row.style.position = "fixed";
+  row.style.left = `${rect.left}px`;
+  row.style.top = `${rect.top}px`;
+  row.style.width = `${rect.width}px`;
+  row.style.zIndex = "60";
+  row.style.marginBottom = "0";
   sectionReorder = {
-    section,
+    row,
     placeholder,
     width: rect.width,
     lockLeft: rect.left,
@@ -310,14 +325,15 @@ function startSectionReorder(section, clientY) {
   };
 }
 
-function moveSectionReorder(clientX, clientY) {
-  if (!sectionReorder || !(workspaceScroll instanceof HTMLElement)) return;
-  const { section, placeholder, width, lockLeft, offsetY } = sectionReorder;
-  section.style.left = `${lockLeft}px`;
-  section.style.top = `${clientY - offsetY}px`;
-  section.style.width = `${width}px`;
+function moveSectionReorder(clientY) {
+  if (!sectionReorder || !(workspaceSectionStack instanceof HTMLElement)) return;
+  const { row, placeholder, width, lockLeft, offsetY } = sectionReorder;
+  const stack = workspaceSectionStack;
+  row.style.left = `${lockLeft}px`;
+  row.style.top = `${clientY - offsetY}px`;
+  row.style.width = `${width}px`;
 
-  const others = [...workspaceScroll.querySelectorAll(".workspace-section")].filter((el) => el !== section);
+  const others = [...stack.querySelectorAll(".workspace-section-row")].filter((el) => el !== row);
   let insertBefore = null;
   for (const other of others) {
     const r = other.getBoundingClientRect();
@@ -327,41 +343,31 @@ function moveSectionReorder(clientX, clientY) {
     }
   }
   if (insertBefore) {
-    workspaceScroll.insertBefore(placeholder, insertBefore);
+    stack.insertBefore(placeholder, insertBefore);
   } else {
-    workspaceScroll.appendChild(placeholder);
+    stack.appendChild(placeholder);
   }
 }
 
 function stopSectionReorder() {
-  if (!sectionReorder || !(workspaceScroll instanceof HTMLElement)) return;
-  const { section, placeholder } = sectionReorder;
-  workspaceScroll.insertBefore(section, placeholder);
+  if (!sectionReorder || !(workspaceSectionStack instanceof HTMLElement)) return;
+  const { row, placeholder } = sectionReorder;
+  const stack = workspaceSectionStack;
+  stack.insertBefore(row, placeholder);
   placeholder.remove();
-  section.classList.remove("is-section-dragging");
-  section.style.position = "";
-  section.style.left = "";
-  section.style.top = "";
-  section.style.width = "";
-  section.style.zIndex = "";
-  section.style.marginBottom = "";
+  row.classList.remove("is-section-dragging");
+  row.style.position = "";
+  row.style.left = "";
+  row.style.top = "";
+  row.style.width = "";
+  row.style.zIndex = "";
+  row.style.marginBottom = "";
   sectionReorder = null;
 }
 
 if (workspaceHandle instanceof HTMLElement) {
   workspaceHandle.addEventListener("mousedown", (event) => {
     if (event.target instanceof HTMLElement && event.target.closest("button")) return;
-    if (event.button !== 0) return;
-    event.preventDefault();
-    startWorkspaceDrag(event);
-  });
-}
-
-if (workspaceNav instanceof HTMLElement) {
-  workspaceNav.addEventListener("mousedown", (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
-    if (target.closest("button")) return;
     if (event.button !== 0) return;
     event.preventDefault();
     startWorkspaceDrag(event);
@@ -408,6 +414,16 @@ if (workspaceScroll instanceof HTMLElement) {
     btn.setAttribute("aria-expanded", String(!collapsed));
     btn.setAttribute("aria-label", collapsed ? "Expand section" : "Collapse section");
     btn.textContent = collapsed ? "▸" : "▾";
+  });
+}
+
+if (workspaceCollapseBtn instanceof HTMLElement) {
+  workspaceCollapseBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (!(workspacePanel instanceof HTMLElement)) return;
+    stopSectionReorder();
+    workspacePanel.classList.toggle("workspace-ui-collapsed");
+    syncWorkspaceCollapseButton();
   });
 }
 
@@ -611,7 +627,7 @@ boardViewport.addEventListener("mousedown", (event) => {
 
 window.addEventListener("mousemove", (event) => {
   if (sectionReorder) {
-    moveSectionReorder(event.clientX, event.clientY);
+    moveSectionReorder(event.clientY);
   } else {
     dragWorkspace(event);
   }
@@ -731,6 +747,7 @@ window.addEventListener("keyup", (event) => {
 renderState(latestState);
 setZoom(0.9);
 syncToolboxButtons();
+syncWorkspaceCollapseButton();
 loadColorHistory();
 addColorToHistory(colorInput.value);
 connect();
