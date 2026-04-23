@@ -121,6 +121,102 @@ body {
   margin-bottom: 0;
 }
 
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #0f172a;
+  user-select: none;
+}
+
+.section-drag-handle {
+  cursor: grab;
+  width: 16px;
+  height: 20px;
+  padding: 0;
+  border-radius: 4px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.section-drag-handle::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 4px;
+  bottom: 4px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(
+    to bottom,
+    #64748b 0 2px,
+    transparent 2px 5px
+  );
+}
+
+.section-drag-handle:hover::before {
+  background: repeating-linear-gradient(
+    to bottom,
+    #94a3b8 0 2px,
+    transparent 2px 5px
+  );
+}
+
+.workspace-section.is-section-dragging .section-drag-handle {
+  cursor: grabbing;
+}
+
+.workspace-section.is-section-dragging {
+  opacity: 0.96;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  border-radius: 10px;
+}
+
+.section-title {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #e2e8f0;
+}
+
+.section-collapse-btn {
+  flex-shrink: 0;
+  min-width: 32px;
+  padding: 2px 8px;
+  font-size: 0.85rem;
+  line-height: 1.3;
+  border-radius: 6px;
+  border: 1px solid #475569;
+  background: #1e293b;
+  color: #cbd5e1;
+  cursor: pointer;
+}
+
+.section-collapse-btn:hover {
+  border-color: #64748b;
+  color: #f1f5f9;
+}
+
+.workspace-section.section-collapsed .workspace-section-body {
+  display: none;
+}
+
+.workspace-section.section-collapsed .section-header {
+  margin-bottom: 0;
+}
+
+.section-reorder-placeholder {
+  margin-bottom: 14px;
+  border: 2px dashed #475569;
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.4);
+  box-sizing: border-box;
+}
+
 .workspace-section h1 {
   margin: 0 0 6px;
   font-size: 1.25rem;
