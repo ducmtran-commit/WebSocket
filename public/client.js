@@ -722,11 +722,26 @@ if (groupFab instanceof HTMLElement) {
 
 function setToolboxDrawingHidden(shouldHide) {
   if (!(toolbox instanceof HTMLElement)) return;
-  if (!shouldAutoHideToolbox || isToolboxMinimized) {
-    toolbox.classList.remove("auto-hidden");
+  const linkedPanels = getLinkedPanelGroup(toolbox);
+  const targets = linkedPanels.length > 0 ? linkedPanels : [toolbox];
+
+  if (!shouldAutoHideToolbox) {
+    targets.forEach((panel) => {
+      if (panel instanceof HTMLElement) {
+        panel.classList.remove("auto-hidden");
+      }
+    });
     return;
   }
-  toolbox.classList.toggle("auto-hidden", shouldHide);
+
+  targets.forEach((panel) => {
+    if (!(panel instanceof HTMLElement)) return;
+    if (panel.classList.contains("minimized")) {
+      panel.classList.remove("auto-hidden");
+      return;
+    }
+    panel.classList.toggle("auto-hidden", shouldHide);
+  });
 }
 
 function renderChat(chat) {
