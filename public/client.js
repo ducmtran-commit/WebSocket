@@ -32,6 +32,8 @@ let reconnectTimer = null;
 let latestState = { gridWidth: 256, gridHeight: 192, pixels: [], users: [], chat: [] };
 let isPainting = false;
 let isErasing = false;
+/** Last grid cell painted while dragging (for line interpolation). */
+let lastPaintGrid = null;
 const ERASE_COLOR = "#0b1220";
 const BASE_PIXEL_SIZE = 8;
 const MIN_ZOOM = 0.7;
@@ -163,6 +165,74 @@ function applyPixel(x, y, color) {
   if (!row || !cell) return;
   row[x] = color;
   cell.style.background = color;
+}
+
+function clientIsOverBoardViewport(clientX, clientY) {
+  if (!(boardViewport instanceof HTMLElement)) return false;
+  const r = boardViewport.getBoundingClientRect();
+  return clientX >= r.left && clientX < r.right && clientY >= r.top && clientY < r.bottom;
+}
+
+function pickCellFromPoint(clientX, clientY) {
+  if (!(board instanceof HTMLElement)) return null;
+  const stack = document.elementsFromPoint(clientX, clientY);
+  for (const node of stack) {
+    if (node instanceof HTMLElement && node.classList.contains("cell") && board.contains(node)) {
+      return node;
+    }
+  }
+  return null;
+}
+
+function eachGridOnLine(x0, y0, x1, y1, visit) {
+  const dx = Math.abs(x1 - x0);
+  const sx = x0 < x1 ? 1 : -1;
+  const dy = -Math.abs(y1 - y0);
+  const sy = y0 < y1 ? 1 : -1;
+  let err = dx + dy;
+  let x = x0;
+  let y = y0;
+  for (;;) {
+    visit(x, y);
+    if (x === x1 && y === y1) break;
+    const e2 = 2 * err;
+    if (e2 >= dy) {
+      err += dy;
+      x += sx;
+    }
+    if (e2 <= dx) {
+      err += dx;
+      y += sy;
+    }
+  }
+}
+
+function paintAtClient(clientX, clientY) {
+  const cell = pickCellFromPoint(clientX, clientY);
+  if (!cell) return;
+  const x = Number(cell.dataset.x);
+  const y = Number(cell.dataset.y);
+  if (!Number.isInteger(x) || !Number.isInteger(y)) return;
+  const color = isErasing ? ERASE_COLOR : colorInput.value;
+
+  const paintOne = (px, py) => {
+    applyPixel(px, py, color);
+    pendingPixels.set(`${px},${py}`, { x: px, y: py, color });
+  };
+
+  if (!lastPaintGrid) {
+    paintOne(x, y);
+    if (!isErasing) addColorToHistory(color, { skipRender: true });
+    lastPaintGrid = { x, y };
+    return;
+  }
+  if (lastPaintGrid.x === x && lastPaintGrid.y === y) return;
+
+  eachGridOnLine(lastPaintGrid.x, lastPaintGrid.y, x, y, (px, py) => {
+    paintOne(px, py);
+  });
+  if (!isErasing) addColorToHistory(color, { skipRender: true });
+  lastPaintGrid = { x, y };
 }
 
 function clearBoardLocal() {
@@ -590,16 +660,7 @@ function connect() {
 }
 
 function paintCellFromEvent(event) {
-  const target = event.target;
-  if (!(target instanceof HTMLElement)) return;
-  if (!target.classList.contains("cell")) return;
-  const x = Number(target.dataset.x);
-  const y = Number(target.dataset.y);
-  if (!Number.isInteger(x) || !Number.isInteger(y)) return;
-  const color = isErasing ? ERASE_COLOR : colorInput.value;
-  if (!isErasing) addColorToHistory(color, { skipRender: true });
-  applyPixel(x, y, color);
-  pendingPixels.set(`${x},${y}`, { x, y, color });
+  paintAtClient(event.clientX, event.clientY);
 }
 
 function flushPaintBatch() {
@@ -618,6 +679,7 @@ function scheduleFlush() {
 function stopPainting() {
   if (!isPainting) return;
   isPainting = false;
+  lastPaintGrid = null;
   setToolboxDrawingHidden(false);
   flushPaintBatch();
   renderColorHistory();
@@ -626,18 +688,9 @@ function stopPainting() {
 board.addEventListener("mousedown", (event) => {
   if (shouldStartPanning(event)) return;
   if (event.button !== 0) return;
+  lastPaintGrid = null;
   isPainting = true;
   setToolboxDrawingHidden(true);
-  paintCellFromEvent(event);
-  scheduleFlush();
-});
-
-board.addEventListener("mouseover", (event) => {
-  if (!isPainting) return;
-  if ((event.buttons & 1) !== 1) {
-    stopPainting();
-    return;
-  }
   paintCellFromEvent(event);
   scheduleFlush();
 });
@@ -661,6 +714,13 @@ boardViewport.addEventListener("mousedown", (event) => {
 window.addEventListener("mousemove", (event) => {
   if (isPainting && (event.buttons & 1) !== 1) {
     stopPainting();
+  } else if (
+    isPainting &&
+    (event.buttons & 1) === 1 &&
+    clientIsOverBoardViewport(event.clientX, event.clientY)
+  ) {
+    paintAtClient(event.clientX, event.clientY);
+    scheduleFlush();
   }
   if (sectionReorder) {
     moveSectionReorder(event.clientY);
@@ -727,12 +787,29 @@ colorInput.addEventListener("change", () => {
   addColorToHistory(colorInput.value);
 });
 
-board.addEventListener("wheel", (event) => {
-  if (!event.ctrlKey) return;
-  event.preventDefault();
-  const step = event.deltaY < 0 ? 0.05 : -0.05;
-  setZoom(zoomLevel + step, event.clientX, event.clientY);
-});
+function wheelZoomStep(event) {
+  let delta = event.deltaY;
+  if (event.deltaMode === 1) {
+    delta *= 16;
+  } else if (event.deltaMode === 2) {
+    delta *= boardViewport.clientHeight;
+  }
+  const sensitivity = 0.0012;
+  return clamp(-delta * sensitivity, -0.12, 0.12);
+}
+
+boardViewport.addEventListener(
+  "wheel",
+  (event) => {
+    if (!(boardViewport instanceof HTMLElement)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const step = wheelZoomStep(event);
+    if (step === 0) return;
+    setZoom(zoomLevel + step, event.clientX, event.clientY);
+  },
+  { passive: false }
+);
 
 sendChatBtn.addEventListener("click", () => {
   const text = chatInput.value.trim();
