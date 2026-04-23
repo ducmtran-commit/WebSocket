@@ -1,4 +1,5 @@
 const http = require("http");
+const fs = require("fs");
 const path = require("path");
 const express = require("express");
 const { WebSocketServer, WebSocket } = require("ws");
@@ -7,6 +8,12 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 const PORT = process.env.PORT || 3000;
+
+const DATA_DIR = path.join(__dirname, "data");
+const BOARD_FILE = path.join(DATA_DIR, "board.json");
+const RETENTION_MS = Math.max(1, Number(process.env.BOARD_RETENTION_HOURS || 48)) * 60 * 60 * 1000;
+const IDLE_WIPE_MS = Math.max(1, Number(process.env.BOARD_IDLE_WIPE_MINUTES || 15)) * 60 * 1000;
+const SAVE_DEBOUNCE_MS = Math.max(3000, Number(process.env.BOARD_SAVE_DEBOUNCE_MS || 12000));
 
 const GRID_WIDTH = 256;
 const GRID_HEIGHT = 192;
@@ -21,6 +28,139 @@ const state = {
   owners: Array.from({ length: GRID_HEIGHT }, () => Array(GRID_WIDTH).fill(null)),
   chat: [],
 };
+
+let lastActivityAt = Date.now();
+let boardDirty = false;
+let saveDebounceTimer = null;
+let idleWipeTimer = null;
+
+function isValidSavedPixels(pixels) {
+  if (!Array.isArray(pixels) || pixels.length !== GRID_HEIGHT) return false;
+  for (let y = 0; y < GRID_HEIGHT; y++) {
+    if (!Array.isArray(pixels[y]) || pixels[y].length !== GRID_WIDTH) return false;
+  }
+  return true;
+}
+
+function countOpenClients() {
+  let n = 0;
+  for (const client of wss.clients) {
+    if (client.readyState === WebSocket.OPEN) n += 1;
+  }
+  return n;
+}
+
+function cancelIdleWipe() {
+  if (idleWipeTimer) {
+    clearTimeout(idleWipeTimer);
+    idleWipeTimer = null;
+  }
+}
+
+function resetBoardToEmpty() {
+  state.pixels = Array.from({ length: GRID_HEIGHT }, () => Array(GRID_WIDTH).fill(DEFAULT_PIXEL));
+  state.owners = Array.from({ length: GRID_HEIGHT }, () => Array(GRID_WIDTH).fill(null));
+  state.chat = [];
+}
+
+function performIdleWipe() {
+  idleWipeTimer = null;
+  if (countOpenClients() > 0) return;
+  resetBoardToEmpty();
+  lastActivityAt = Date.now();
+  boardDirty = false;
+  try {
+    fs.unlinkSync(BOARD_FILE);
+  } catch {
+    // File may not exist.
+  }
+  console.log("Board wiped: no clients connected for idle period.");
+}
+
+function scheduleIdleWipeIfEmpty() {
+  if (countOpenClients() > 0) return;
+  cancelIdleWipe();
+  idleWipeTimer = setTimeout(performIdleWipe, IDLE_WIPE_MS);
+}
+
+function flushBoardSave() {
+  saveDebounceTimer = null;
+  if (!boardDirty) return;
+  boardDirty = false;
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    const payload = JSON.stringify({
+      version: 1,
+      lastActivityAt,
+      pixels: state.pixels,
+      chat: state.chat,
+    });
+    const tmp = `${BOARD_FILE}.tmp`;
+    fs.writeFileSync(tmp, payload, "utf8");
+    fs.renameSync(tmp, BOARD_FILE);
+  } catch (err) {
+    console.warn("Board save failed:", err.message);
+    boardDirty = true;
+  }
+}
+
+function touchBoardActivity() {
+  lastActivityAt = Date.now();
+  boardDirty = true;
+  if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
+  saveDebounceTimer = setTimeout(flushBoardSave, SAVE_DEBOUNCE_MS);
+}
+
+function tryLoadBoardFromDisk() {
+  try {
+    if (!fs.existsSync(BOARD_FILE)) return;
+    const raw = fs.readFileSync(BOARD_FILE, "utf8");
+    const data = JSON.parse(raw);
+    const savedAt = Number(data.lastActivityAt) || 0;
+    if (Date.now() - savedAt > RETENTION_MS) {
+      fs.unlinkSync(BOARD_FILE);
+      console.log("Discarded saved board: older than retention window.");
+      return;
+    }
+    if (!isValidSavedPixels(data.pixels)) {
+      console.warn("Discarded saved board: invalid pixel grid.");
+      return;
+    }
+    state.pixels = data.pixels;
+    state.owners = Array.from({ length: GRID_HEIGHT }, () => Array(GRID_WIDTH).fill(null));
+    state.chat = Array.isArray(data.chat) ? data.chat.slice(-30) : [];
+    lastActivityAt = savedAt;
+    console.log("Restored board from disk (within retention window).");
+  } catch (err) {
+    console.warn("Board load failed:", err.message);
+  }
+}
+
+tryLoadBoardFromDisk();
+
+setInterval(() => {
+  if (boardDirty && saveDebounceTimer == null) {
+    flushBoardSave();
+  }
+}, 60000);
+
+function shutdownPersist() {
+  cancelIdleWipe();
+  if (saveDebounceTimer) {
+    clearTimeout(saveDebounceTimer);
+    saveDebounceTimer = null;
+  }
+  if (boardDirty) flushBoardSave();
+}
+
+process.on("SIGINT", () => {
+  shutdownPersist();
+  process.exit(0);
+});
+process.on("SIGTERM", () => {
+  shutdownPersist();
+  process.exit(0);
+});
 
 function randomColor() {
   const palette = ["#f97316", "#0ea5e9", "#22c55e", "#a855f7", "#ef4444", "#14b8a6", "#eab308"];
@@ -110,6 +250,8 @@ function addChat(author, text, authorId = null) {
 }
 
 wss.on("connection", (ws) => {
+  cancelIdleWipe();
+
   const userId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const user = {
     id: userId,
@@ -126,6 +268,7 @@ wss.on("connection", (ws) => {
   sendInitState(ws);
   broadcastUsers();
   broadcastChat();
+  touchBoardActivity();
 
   ws.on("message", (raw) => {
     let msg;
@@ -144,6 +287,7 @@ wss.on("connection", (ws) => {
       addChat("System", `${current.name} updated their name.`);
       broadcastUsers();
       broadcastChat();
+      touchBoardActivity();
       return;
     }
 
@@ -175,6 +319,7 @@ wss.on("connection", (ws) => {
         ws.undoStack.push({ changes });
         if (ws.undoStack.length > 80) ws.undoStack.shift();
         ws.redoStack = [];
+        touchBoardActivity();
       }
       return;
     }
@@ -191,6 +336,7 @@ wss.on("connection", (ws) => {
       broadcastPixelsUpdated(updates);
       ws.redoStack.push(action);
       if (ws.redoStack.length > 80) ws.redoStack.shift();
+      touchBoardActivity();
       return;
     }
 
@@ -206,6 +352,7 @@ wss.on("connection", (ws) => {
       broadcastPixelsUpdated(updates);
       ws.undoStack.push(action);
       if (ws.undoStack.length > 80) ws.undoStack.shift();
+      touchBoardActivity();
       return;
     }
 
@@ -226,6 +373,7 @@ wss.on("connection", (ws) => {
       ws.redoStack = [];
       addChat("System", `${current.name} cleared their drawing.`);
       broadcastChat();
+      touchBoardActivity();
       return;
     }
 
@@ -234,6 +382,7 @@ wss.on("connection", (ws) => {
       if (!text) return;
       addChat(current.name, text, current.id);
       broadcastChat();
+      touchBoardActivity();
     }
   });
 
@@ -245,9 +394,13 @@ wss.on("connection", (ws) => {
       broadcastUsers();
       broadcastChat();
     }
+    scheduleIdleWipeIfEmpty();
   });
 });
 
 server.listen(PORT, () => {
   console.log(`Pixel Board server running on port ${PORT}`);
+  console.log(
+    `Board disk: ${BOARD_FILE} (retention ${RETENTION_MS / 3600000}h, idle wipe after ${IDLE_WIPE_MS / 60000}m with no clients)`
+  );
 });
