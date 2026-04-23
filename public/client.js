@@ -323,17 +323,16 @@ function setupPanelInteractions(panel, handle, fab, toggleMinimized) {
 setupPanelInteractions(toolbox, toolboxHandle, toolboxFab, toggleToolboxMinimized);
 setupPanelInteractions(chatPanel, chatHandle, chatFab, toggleChatMinimized);
 
-if (chatPanel instanceof HTMLElement) {
-  const right = window.innerWidth - chatPanel.getBoundingClientRect().right;
-  const safeRight = clamp(right, 0, window.innerWidth - chatPanel.offsetWidth);
-  chatPanel.style.left = `${window.innerWidth - chatPanel.offsetWidth - safeRight}px`;
-  chatPanel.style.right = "auto";
-  chatPanel.style.top = "16px";
-}
-
 if (toolbox instanceof HTMLElement) {
   toolbox.style.left = "16px";
   toolbox.style.top = "16px";
+  toolbox.style.right = "auto";
+}
+
+if (chatPanel instanceof HTMLElement) {
+  chatPanel.style.left = `${Math.max(16, window.innerWidth - 68)}px`;
+  chatPanel.style.top = "16px";
+  chatPanel.style.right = "auto";
 }
 
 function setToolboxDrawingHidden(shouldHide) {
