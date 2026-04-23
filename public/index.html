@@ -9,10 +9,17 @@
   <body>
     <main class="layout">
       <section class="left">
-        <div id="toolboxHandle" class="left-drag-handle">Drag Toolbox</div>
-        <h1>Co-op Pixel Board</h1>
-        <p class="subtitle">Everyone paints the same board in real time.</p>
-        <div class="panel">
+        <div id="toolboxHandle" class="left-drag-handle">
+          <span class="drag-title">Drag Toolbox</span>
+          <div class="toolbox-actions">
+            <button id="autoHideBtn" type="button">Auto-hide: On</button>
+            <button id="toggleToolboxBtn" type="button">Minimize</button>
+          </div>
+        </div>
+        <div class="toolbox-content">
+          <h1>Co-op Pixel Board</h1>
+          <p class="subtitle">Everyone paints the same board in real time.</p>
+          <div class="panel">
           <label for="nameInput">Display Name</label>
           <div class="row">
             <input id="nameInput" type="text" maxlength="20" value="Student" />
@@ -36,14 +43,15 @@
           <p id="toolText">Tool: Brush</p>
           <p id="statusText">Status: connecting...</p>
           <p id="playersText">Artists online: 0</p>
-        </div>
+          </div>
 
-        <div class="panel">
-          <h2>Chat</h2>
-          <div id="chatBox" class="chat-box"></div>
-          <div class="row">
-            <input id="chatInput" type="text" maxlength="120" placeholder="Say something..." />
-            <button id="sendChatBtn">Send</button>
+          <div class="panel">
+            <h2>Chat</h2>
+            <div id="chatBox" class="chat-box"></div>
+            <div class="row">
+              <input id="chatInput" type="text" maxlength="120" placeholder="Say something..." />
+              <button id="sendChatBtn">Send</button>
+            </div>
           </div>
         </div>
       </section>
