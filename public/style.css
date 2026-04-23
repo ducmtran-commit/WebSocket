@@ -31,7 +31,7 @@ body {
   color: #94a3b8;
 }
 
-.left {
+.floating-panel {
   position: fixed;
   top: 16px;
   left: 16px;
@@ -45,6 +45,14 @@ body {
   background: rgba(15, 23, 42, 0.95);
   backdrop-filter: blur(4px);
   transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.chat-panel {
+  top: 16px;
+  right: 16px;
+  left: auto;
+  width: min(360px, calc(100vw - 32px));
+  z-index: 35;
 }
 
 .left-drag-handle {
@@ -77,11 +85,11 @@ body {
   font-size: 0.8rem;
 }
 
-.left.is-dragging {
+.floating-panel.is-dragging {
   user-select: none;
 }
 
-.left.minimized {
+.floating-panel.minimized {
   width: 52px;
   height: 52px;
   min-width: 52px;
@@ -93,12 +101,13 @@ body {
   backdrop-filter: none;
 }
 
-.left.minimized .toolbox-content,
-.left.minimized .left-drag-handle {
+.floating-panel.minimized .toolbox-content,
+.floating-panel.minimized .chat-content,
+.floating-panel.minimized .left-drag-handle {
   display: none;
 }
 
-.left.auto-hidden .toolbox-content {
+.floating-panel.auto-hidden .toolbox-content {
   opacity: 0;
   pointer-events: none;
 }
@@ -116,7 +125,7 @@ body {
   box-shadow: 0 6px 20px rgba(2, 6, 23, 0.5);
 }
 
-.left.minimized .toolbox-fab {
+.floating-panel.minimized .toolbox-fab {
   display: block;
 }
 
@@ -247,11 +256,16 @@ input {
 }
 
 @media (max-width: 920px) {
-  .left {
+  .floating-panel {
     width: min(340px, calc(100vw - 24px));
     top: 12px;
     left: 12px;
     max-height: calc(100vh - 24px);
+  }
+
+  .chat-panel {
+    right: 12px;
+    left: auto;
   }
 
   .board-viewport {
