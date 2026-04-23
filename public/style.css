@@ -56,6 +56,11 @@ body {
   z-index: 35;
 }
 
+.artists-panel {
+  width: min(240px, calc(100vw - 32px));
+  z-index: 34;
+}
+
 .left-drag-handle {
   cursor: move;
   user-select: none;
@@ -104,6 +109,7 @@ body {
 
 .floating-panel.minimized .toolbox-content,
 .floating-panel.minimized .chat-content,
+.floating-panel.minimized .artists-content,
 .floating-panel.minimized .left-drag-handle {
   display: none;
 }
@@ -145,8 +151,7 @@ body {
   color: #cbd5e1;
 }
 
-.panel,
-.legend {
+.panel {
   border: 1px solid #334155;
   border-radius: 12px;
   background: #111827;
@@ -260,16 +265,6 @@ input {
   padding-left: 18px;
 }
 
-.legend {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  width: min(240px, calc(100vw - 32px));
-  max-height: 40vh;
-  overflow: auto;
-  z-index: 30;
-}
-
 @media (max-width: 920px) {
   .floating-panel {
     width: min(340px, calc(100vw - 24px));
@@ -287,8 +282,4 @@ input {
     height: 100vh;
   }
 
-  .legend {
-    right: 12px;
-    bottom: 12px;
-  }
 }
