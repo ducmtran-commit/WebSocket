@@ -211,7 +211,10 @@ function eachGridOnLine(x0, y0, x1, y1, visit) {
 
 function paintAtClient(clientX, clientY) {
   const cell = pickCellFromPoint(clientX, clientY);
-  if (!cell) return;
+  if (!cell) {
+    lastPaintGrid = null;
+    return;
+  }
   const x = Number(cell.dataset.x);
   const y = Number(cell.dataset.y);
   if (!Number.isInteger(x) || !Number.isInteger(y)) return;
@@ -228,7 +231,6 @@ function paintAtClient(clientX, clientY) {
     lastPaintGrid = { x, y };
     return;
   }
-  if (lastPaintGrid.x === x && lastPaintGrid.y === y) return;
 
   eachGridOnLine(lastPaintGrid.x, lastPaintGrid.y, x, y, (px, py) => {
     paintOne(px, py);
@@ -712,6 +714,7 @@ function stopPainting() {
 board.addEventListener("mousedown", (event) => {
   if (shouldStartPanning(event)) return;
   if (event.button !== 0) return;
+  event.preventDefault();
   lastPaintGrid = null;
   isPainting = true;
   setToolboxDrawingHidden(true);
