@@ -34,6 +34,11 @@ let isPainting = false;
 let isErasing = false;
 /** Last grid cell painted while dragging (for line interpolation). */
 let lastPaintGrid = null;
+/** Pointer capture id while painting (keeps events if cursor leaves board briefly). */
+let paintCapturePointerId = null;
+/** Coalesce remote pixel updates to one apply pass per animation frame. */
+const pendingRemotePixels = new Map();
+let remotePixelFlushRaf = null;
 const ERASE_COLOR = "#0b1220";
 const BASE_PIXEL_SIZE = 8;
 const MIN_ZOOM = 0.7;
@@ -139,6 +144,27 @@ function shouldHandleCanvasShortcut(event) {
   if (!(target instanceof HTMLElement)) return true;
   const tag = target.tagName;
   return tag !== "INPUT" && tag !== "TEXTAREA" && !target.isContentEditable;
+}
+
+function isValidPixelGrid(pixels, height, width) {
+  if (!Array.isArray(pixels) || pixels.length !== height) return false;
+  for (let y = 0; y < height; y++) {
+    if (!Array.isArray(pixels[y]) || pixels[y].length !== width) return false;
+  }
+  return true;
+}
+
+function clonePixelGridFrom(pixels, height, width) {
+  const out = [];
+  for (let y = 0; y < height; y++) {
+    out[y] = [];
+    const row = Array.isArray(pixels?.[y]) ? pixels[y] : null;
+    for (let x = 0; x < width; x++) {
+      const c = row?.[x];
+      out[y][x] = typeof c === "string" && /^#[0-9a-fA-F]{6}$/i.test(c) ? c : ERASE_COLOR;
+    }
+  }
+  return out;
 }
 
 function createBoard(state) {
@@ -613,14 +639,31 @@ function renderUsers(users) {
 }
 
 function renderState(state) {
-  latestState = state;
-  playersText.textContent = `Artists online: ${state.users.length}`;
-  createBoard(state);
+  const gw = Number(state.gridWidth) || latestState.gridWidth || 256;
+  const gh = Number(state.gridHeight) || latestState.gridHeight || 192;
+  let sourcePixels = state.pixels;
+  if (!isValidPixelGrid(sourcePixels, gh, gw)) {
+    sourcePixels = isValidPixelGrid(latestState.pixels, gh, gw) ? latestState.pixels : null;
+  }
+  const pixels =
+    sourcePixels == null ? clonePixelGridFrom(null, gh, gw) : clonePixelGridFrom(sourcePixels, gh, gw);
+
+  latestState = {
+    ...state,
+    gridWidth: gw,
+    gridHeight: gh,
+    pixels,
+    users: Array.isArray(state.users) ? state.users : latestState.users || [],
+    chat: Array.isArray(state.chat) ? state.chat : latestState.chat || [],
+  };
+
+  playersText.textContent = `Artists online: ${latestState.users.length}`;
+  createBoard(latestState);
   window.requestAnimationFrame(() => {
     centerBoardViewport();
   });
-  renderChat(state.chat);
-  renderUsers(state.users);
+  renderChat(latestState.chat);
+  renderUsers(latestState.users);
 }
 
 function connect() {
@@ -628,6 +671,16 @@ function connect() {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
   }
+  if (flushTimer) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
+  if (remotePixelFlushRaf != null) {
+    cancelAnimationFrame(remotePixelFlushRaf);
+    remotePixelFlushRaf = null;
+  }
+  pendingRemotePixels.clear();
+  releasePaintCapture();
 
   statusText.textContent = "Status: connecting...";
   ws = new WebSocket(wsUrl());
@@ -670,9 +723,7 @@ function connect() {
     }
 
     if (msg.type === "pixels-updated" && Array.isArray(msg.pixels)) {
-      msg.pixels.forEach((pixel) => {
-        applyPixel(Number(pixel.x), Number(pixel.y), pixel.color);
-      });
+      queueRemotePixels(msg.pixels);
       return;
     }
   });
@@ -689,23 +740,62 @@ function paintCellFromEvent(event) {
   paintAtClient(event.clientX, event.clientY);
 }
 
+function flushRemotePixelBatch() {
+  remotePixelFlushRaf = null;
+  if (pendingRemotePixels.size === 0) return;
+  for (const pixel of pendingRemotePixels.values()) {
+    applyPixel(Number(pixel.x), Number(pixel.y), pixel.color);
+  }
+  pendingRemotePixels.clear();
+}
+
+function queueRemotePixels(pixels) {
+  for (const p of pixels) {
+    if (!p) continue;
+    const x = Number(p.x);
+    const y = Number(p.y);
+    if (!Number.isInteger(x) || !Number.isInteger(y)) continue;
+    pendingRemotePixels.set(`${x},${y}`, { x, y, color: p.color });
+  }
+  if (remotePixelFlushRaf == null) {
+    remotePixelFlushRaf = requestAnimationFrame(flushRemotePixelBatch);
+  }
+}
+
+const MAX_PAINT_BATCH = 360;
+
 function flushPaintBatch() {
   flushTimer = null;
   if (pendingPixels.size === 0) return;
   const pixels = Array.from(pendingPixels.values());
   pendingPixels.clear();
-  send({ type: "paint-batch", pixels });
+  for (let i = 0; i < pixels.length; i += MAX_PAINT_BATCH) {
+    send({ type: "paint-batch", pixels: pixels.slice(i, i + MAX_PAINT_BATCH) });
+  }
 }
 
 function scheduleFlush() {
   if (flushTimer) return;
-  flushTimer = window.setTimeout(flushPaintBatch, 8);
+  flushTimer = window.setTimeout(flushPaintBatch, 14);
+}
+
+function releasePaintCapture() {
+  if (paintCapturePointerId == null) return;
+  try {
+    if (board.releasePointerCapture) {
+      board.releasePointerCapture(paintCapturePointerId);
+    }
+  } catch {
+    // Ignore if capture already released.
+  }
+  paintCapturePointerId = null;
 }
 
 function stopPainting() {
   if (!isPainting) return;
   isPainting = false;
   lastPaintGrid = null;
+  releasePaintCapture();
   setToolboxDrawingHidden(false);
   flushPaintBatch();
   renderColorHistory();
@@ -718,6 +808,14 @@ board.addEventListener("mousedown", (event) => {
   lastPaintGrid = null;
   isPainting = true;
   setToolboxDrawingHidden(true);
+  if (typeof event.pointerId === "number" && board.setPointerCapture) {
+    try {
+      board.setPointerCapture(event.pointerId);
+      paintCapturePointerId = event.pointerId;
+    } catch {
+      paintCapturePointerId = null;
+    }
+  }
   paintCellFromEvent(event);
   scheduleFlush();
 });
@@ -795,6 +893,13 @@ eraserBtn.addEventListener("click", () => {
 });
 
 clearBtn.addEventListener("click", () => {
+  if (
+    !window.confirm(
+      "Clear only the pixels you painted on the shared board? Other artists’ pixels stay."
+    )
+  ) {
+    return;
+  }
   send({ type: "clear-board" });
 });
 
