@@ -286,6 +286,26 @@ function toggleChatMinimized() {
 
 function setupPanelInteractions(panel, handle, fab, toggleMinimized) {
   if (panel instanceof HTMLElement) {
+    panel.addEventListener("mousedown", (event) => {
+      if (event.button !== 0) return;
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const isInteractive =
+        Boolean(target.closest("button")) ||
+        Boolean(target.closest("input")) ||
+        Boolean(target.closest("textarea")) ||
+        Boolean(target.closest("select")) ||
+        target.isContentEditable;
+      if (isInteractive) return;
+
+      const isPanelMinimized = panel.classList.contains("minimized");
+      if (isPanelMinimized) return;
+      event.preventDefault();
+      startPanelDrag(panel, event, false);
+    });
+  }
+
+  if (panel instanceof HTMLElement) {
     panel.addEventListener("dblclick", (event) => {
       if (event.button !== 0) return;
       event.preventDefault();
@@ -331,7 +351,7 @@ if (toolbox instanceof HTMLElement) {
 
 if (chatPanel instanceof HTMLElement) {
   chatPanel.style.left = `${Math.max(16, window.innerWidth - 68)}px`;
-  chatPanel.style.top = "16px";
+  chatPanel.style.top = "88px";
   chatPanel.style.right = "auto";
 }
 
@@ -346,6 +366,9 @@ function setToolboxDrawingHidden(shouldHide) {
 
 function renderChat(chat) {
   chatBox.innerHTML = "";
+  const colorById = new Map(
+    (latestState.users || []).map((user) => [String(user.id || ""), String(user.color || "#e2e8f0")])
+  );
   const colorByName = new Map(
     (latestState.users || []).map((user) => [String(user.name || ""), String(user.color || "#e2e8f0")])
   );
@@ -356,7 +379,8 @@ function renderChat(chat) {
     const author = document.createElement("span");
     author.className = "chat-author";
     author.textContent = `${entry.author}:`;
-    const authorColor = colorByName.get(String(entry.author || ""));
+    const authorColor =
+      colorById.get(String(entry.authorId || "")) || colorByName.get(String(entry.author || ""));
     if (authorColor) {
       author.style.color = authorColor;
     }
@@ -424,6 +448,7 @@ function connect() {
       latestState.users = msg.users || [];
       playersText.textContent = `Artists online: ${latestState.users.length}`;
       renderUsers(latestState.users);
+      renderChat(latestState.chat);
       return;
     }
 
