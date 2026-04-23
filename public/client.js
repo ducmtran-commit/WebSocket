@@ -31,6 +31,8 @@ const undockToolboxBtn = document.getElementById("undockToolboxBtn");
 const undockChatBtn = document.getElementById("undockChatBtn");
 const undockArtistsBtn = document.getElementById("undockArtistsBtn");
 const groupFab = document.getElementById("groupFab");
+const toggleChatBtn = document.getElementById("toggleChatBtn");
+const toggleArtistsBtn = document.getElementById("toggleArtistsBtn");
 
 let ws;
 let reconnectAttempts = 0;
@@ -272,6 +274,14 @@ function syncToolboxButtons() {
   }
   if (artistsFab instanceof HTMLElement) {
     artistsFab.setAttribute("aria-label", isArtistsMinimized ? "Open artists" : "Artists");
+  }
+  if (toggleChatBtn instanceof HTMLElement) {
+    toggleChatBtn.textContent = isChatMinimized ? "+" : "_";
+    toggleChatBtn.title = isChatMinimized ? "Expand chat" : "Minimize chat";
+  }
+  if (toggleArtistsBtn instanceof HTMLElement) {
+    toggleArtistsBtn.textContent = isArtistsMinimized ? "+" : "_";
+    toggleArtistsBtn.title = isArtistsMinimized ? "Expand artists" : "Minimize artists";
   }
 }
 
@@ -602,6 +612,20 @@ if (undockArtistsBtn instanceof HTMLElement) {
   });
 }
 
+if (toggleChatBtn instanceof HTMLElement) {
+  toggleChatBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleChatMinimized();
+  });
+}
+
+if (toggleArtistsBtn instanceof HTMLElement) {
+  toggleArtistsBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleArtistsMinimized();
+  });
+}
+
 if (groupFab instanceof HTMLElement) {
   groupFab.addEventListener("click", () => {
     const shouldOpenAll = isToolboxMinimized || isChatMinimized || isArtistsMinimized;
@@ -919,9 +943,19 @@ window.addEventListener("keyup", (event) => {
 
 renderState(latestState);
 setZoom(0.9);
-setToolboxMinimized(true);
-setChatMinimized(true);
-setArtistsMinimized(true);
+setToolboxMinimized(false);
+setChatMinimized(false);
+setArtistsMinimized(false);
+if (toolbox instanceof HTMLElement && chatPanel instanceof HTMLElement && artistsPanel instanceof HTMLElement) {
+  toolbox.style.left = "24px";
+  toolbox.style.top = "40px";
+  chatPanel.style.left = `${toolbox.offsetLeft + toolbox.offsetWidth + PANEL_DOCK_GAP}px`;
+  chatPanel.style.top = "40px";
+  artistsPanel.style.left = chatPanel.style.left;
+  artistsPanel.style.top = `${chatPanel.offsetTop + chatPanel.offsetHeight + PANEL_DOCK_GAP}px`;
+  linkPanels(toolbox, chatPanel);
+  linkPanels(chatPanel, artistsPanel);
+}
 syncToolboxButtons();
 updateGroupFabVisibility();
 loadColorHistory();
