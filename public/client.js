@@ -27,6 +27,10 @@ const chatFab = document.getElementById("chatFab");
 const artistsPanel = document.getElementById("artistsPanel");
 const artistsHandle = document.getElementById("artistsHandle");
 const artistsFab = document.getElementById("artistsFab");
+const undockToolboxBtn = document.getElementById("undockToolboxBtn");
+const undockChatBtn = document.getElementById("undockChatBtn");
+const undockArtistsBtn = document.getElementById("undockArtistsBtn");
+const groupFab = document.getElementById("groupFab");
 
 let ws;
 let reconnectAttempts = 0;
@@ -365,6 +369,7 @@ function linkPanels(a, b) {
   ensurePanelLinkEntry(b);
   panelLinks.get(a).add(b);
   panelLinks.get(b).add(a);
+  updateGroupFabVisibility();
 }
 
 function unlinkPanel(panel) {
@@ -378,6 +383,20 @@ function unlinkPanel(panel) {
     }
   });
   panelLinks.set(panel, new Set());
+  updateGroupFabVisibility();
+}
+
+function hasAnyLinkedPanels() {
+  for (const panel of panelArray()) {
+    const links = panelLinks.get(panel);
+    if (links && links.size > 0) return true;
+  }
+  return false;
+}
+
+function updateGroupFabVisibility() {
+  if (!(groupFab instanceof HTMLElement)) return;
+  groupFab.classList.toggle("visible", hasAnyLinkedPanels());
 }
 
 function getLinkedPanelGroup(start) {
@@ -560,6 +579,36 @@ if (artistsPanel instanceof HTMLElement) {
   artistsPanel.style.left = `${Math.max(16, window.innerWidth - 84)}px`;
   artistsPanel.style.top = `${Math.max(16, window.innerHeight - 84)}px`;
   artistsPanel.style.right = "auto";
+}
+
+if (undockToolboxBtn instanceof HTMLElement) {
+  undockToolboxBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    unlinkPanel(toolbox);
+  });
+}
+
+if (undockChatBtn instanceof HTMLElement) {
+  undockChatBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    unlinkPanel(chatPanel);
+  });
+}
+
+if (undockArtistsBtn instanceof HTMLElement) {
+  undockArtistsBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    unlinkPanel(artistsPanel);
+  });
+}
+
+if (groupFab instanceof HTMLElement) {
+  groupFab.addEventListener("click", () => {
+    const shouldOpenAll = isToolboxMinimized || isChatMinimized || isArtistsMinimized;
+    setToolboxMinimized(!shouldOpenAll);
+    setChatMinimized(!shouldOpenAll);
+    setArtistsMinimized(!shouldOpenAll);
+  });
 }
 
 function setToolboxDrawingHidden(shouldHide) {
@@ -874,6 +923,7 @@ setToolboxMinimized(true);
 setChatMinimized(true);
 setArtistsMinimized(true);
 syncToolboxButtons();
+updateGroupFabVisibility();
 loadColorHistory();
 addColorToHistory(colorInput.value);
 connect();
