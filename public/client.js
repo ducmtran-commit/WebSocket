@@ -22,8 +22,6 @@ const workspaceHandle = document.getElementById("workspaceHandle");
 const workspaceScroll = document.getElementById("workspaceScroll");
 const workspaceSectionStack = document.getElementById("workspaceSectionStack");
 const workspaceCollapseBtn = document.getElementById("workspaceCollapseBtn");
-const navScrollUp = document.getElementById("navScrollUp");
-const navScrollDown = document.getElementById("navScrollDown");
 const autoHideBtn = document.getElementById("autoHideBtn");
 
 let ws;
@@ -427,32 +425,15 @@ function movePanelBy(panel, deltaX, deltaY) {
   panel.style.right = "auto";
 }
 
-function scrollWorkspaceBy(deltaY) {
-  if (!(workspaceScroll instanceof HTMLElement)) return;
-  workspaceScroll.scrollTop = clamp(
-    workspaceScroll.scrollTop + deltaY,
-    0,
-    Math.max(0, workspaceScroll.scrollHeight - workspaceScroll.clientHeight)
-  );
-}
-
-function jumpToSection(sectionId) {
-  const el = document.getElementById(sectionId);
-  if (!(el instanceof HTMLElement)) return;
-  const row = el.closest(".workspace-section-row");
-  const target = row instanceof HTMLElement ? row : el;
-  target.scrollIntoView({ behavior: "smooth", block: "nearest" });
-}
-
 function startSectionReorder(section, clientY) {
   const row = section.closest(".workspace-section-row");
   const stack = workspaceSectionStack;
   if (!(row instanceof HTMLElement) || !(stack instanceof HTMLElement)) return;
   const rect = row.getBoundingClientRect();
   const placeholder = document.createElement("div");
-  placeholder.className = "workspace-align-row workspace-section-placeholder";
+  placeholder.className = "workspace-section-row workspace-section-placeholder";
   placeholder.innerHTML =
-    '<div class="workspace-nav-cell" aria-hidden="true"></div><div class="workspace-content-cell"><div class="workspace-section-placeholder-dash" aria-hidden="true"></div></div>';
+    '<div class="workspace-section-placeholder-dash" aria-hidden="true"></div>';
   placeholder.style.minHeight = `${rect.height}px`;
   stack.insertBefore(placeholder, row);
   row.classList.add("is-section-dragging");
@@ -480,7 +461,9 @@ function moveSectionReorder(clientY) {
   row.style.top = `${clientY - offsetY}px`;
   row.style.width = `${width}px`;
 
-  const others = [...stack.querySelectorAll(".workspace-section-row")].filter((el) => el !== row);
+  const others = [...stack.querySelectorAll(".workspace-section-row")].filter(
+    (el) => el !== row && !el.classList.contains("workspace-section-placeholder")
+  );
   let insertBefore = null;
   for (const other of others) {
     const r = other.getBoundingClientRect();
@@ -525,21 +508,6 @@ if (workspaceHandle instanceof HTMLElement) {
     startWorkspaceDrag(event);
   });
 }
-
-if (navScrollUp instanceof HTMLElement) {
-  navScrollUp.addEventListener("click", () => scrollWorkspaceBy(-160));
-}
-
-if (navScrollDown instanceof HTMLElement) {
-  navScrollDown.addEventListener("click", () => scrollWorkspaceBy(160));
-}
-
-document.querySelectorAll(".nav-jump").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const id = btn.getAttribute("data-target");
-    if (id) jumpToSection(id);
-  });
-});
 
 if (workspaceScroll instanceof HTMLElement) {
   workspaceScroll.addEventListener("mousedown", (event) => {
