@@ -17,10 +17,13 @@ const chatBox = document.getElementById("chatBox");
 const chatInput = document.getElementById("chatInput");
 const sendChatBtn = document.getElementById("sendChatBtn");
 const colorHistory = document.getElementById("colorHistory");
-const toolbox = document.querySelector(".left");
+const toolbox = document.getElementById("toolboxPanel");
 const toolboxHandle = document.getElementById("toolboxHandle");
 const toolboxFab = document.getElementById("toolboxFab");
 const autoHideBtn = document.getElementById("autoHideBtn");
+const chatPanel = document.getElementById("chatPanel");
+const chatHandle = document.getElementById("chatHandle");
+const chatFab = document.getElementById("chatFab");
 
 let ws;
 let reconnectAttempts = 0;
@@ -39,12 +42,12 @@ let panStartY = 0;
 let panScrollLeft = 0;
 let panScrollTop = 0;
 let isSpaceHeld = false;
-let isDraggingToolbox = false;
-let toolboxDragOffsetX = 0;
-let toolboxDragOffsetY = 0;
 let isToolboxMinimized = false;
+let isChatMinimized = false;
 let shouldAutoHideToolbox = true;
-let minimizeTimer = null;
+let activeDraggedPanel = null;
+let panelDragOffsetX = 0;
+let panelDragOffsetY = 0;
 const COLOR_HISTORY_KEY = "pixel-board-color-history";
 const MAX_COLOR_HISTORY = 10;
 let recentColors = [];
@@ -191,24 +194,13 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
-function startToolboxDrag(event) {
-  if (!(toolbox instanceof HTMLElement)) return;
-  isDraggingToolbox = true;
-  const rect = toolbox.getBoundingClientRect();
-  toolboxDragOffsetX = event.clientX - rect.left;
-  toolboxDragOffsetY = event.clientY - rect.top;
-  toolbox.classList.add("is-dragging");
-}
-
-function dragToolbox(event) {
-  if (!isDraggingToolbox) return;
-  if (!(toolbox instanceof HTMLElement)) return;
-  const maxLeft = window.innerWidth - toolbox.offsetWidth;
-  const maxTop = window.innerHeight - toolbox.offsetHeight;
-  const nextLeft = clamp(event.clientX - toolboxDragOffsetX, 0, Math.max(0, maxLeft));
-  const nextTop = clamp(event.clientY - toolboxDragOffsetY, 0, Math.max(0, maxTop));
-  toolbox.style.left = `${nextLeft}px`;
-  toolbox.style.top = `${nextTop}px`;
+function startPanelDrag(panel, event) {
+  if (!(panel instanceof HTMLElement)) return;
+  activeDraggedPanel = panel;
+  const rect = panel.getBoundingClientRect();
+  panelDragOffsetX = event.clientX - rect.left;
+  panelDragOffsetY = event.clientY - rect.top;
+  panel.classList.add("is-dragging");
 }
 
 function syncToolboxButtons() {
@@ -217,6 +209,9 @@ function syncToolboxButtons() {
   }
   if (toolboxFab instanceof HTMLElement) {
     toolboxFab.setAttribute("aria-label", isToolboxMinimized ? "Open toolbox" : "Toolbox");
+  }
+  if (chatFab instanceof HTMLElement) {
+    chatFab.setAttribute("aria-label", isChatMinimized ? "Open chat" : "Chat");
   }
 }
 
@@ -231,18 +226,87 @@ function setToolboxMinimized(nextState) {
   syncToolboxButtons();
 }
 
-function clearMinimizeTimer() {
-  if (!minimizeTimer) return;
-  window.clearTimeout(minimizeTimer);
-  minimizeTimer = null;
+function setChatMinimized(nextState) {
+  isChatMinimized = nextState;
+  if (chatPanel instanceof HTMLElement) {
+    chatPanel.classList.toggle("minimized", isChatMinimized);
+  }
+  syncToolboxButtons();
 }
 
-function scheduleToolboxMinimize() {
-  clearMinimizeTimer();
-  minimizeTimer = window.setTimeout(() => {
-    if (isDraggingToolbox || isPainting) return;
-    setToolboxMinimized(true);
-  }, 280);
+function dragActivePanel(event) {
+  if (!(activeDraggedPanel instanceof HTMLElement)) return;
+  const maxLeft = window.innerWidth - activeDraggedPanel.offsetWidth;
+  const maxTop = window.innerHeight - activeDraggedPanel.offsetHeight;
+  const nextLeft = clamp(event.clientX - panelDragOffsetX, 0, Math.max(0, maxLeft));
+  const nextTop = clamp(event.clientY - panelDragOffsetY, 0, Math.max(0, maxTop));
+  activeDraggedPanel.style.left = `${nextLeft}px`;
+  activeDraggedPanel.style.top = `${nextTop}px`;
+  if (activeDraggedPanel === chatPanel) {
+    activeDraggedPanel.style.right = "auto";
+  }
+}
+
+function stopPanelDrag() {
+  if (!(activeDraggedPanel instanceof HTMLElement)) return;
+  activeDraggedPanel.classList.remove("is-dragging");
+  activeDraggedPanel = null;
+}
+
+function toggleToolboxMinimized() {
+  setToolboxMinimized(!isToolboxMinimized);
+}
+
+function toggleChatMinimized() {
+  setChatMinimized(!isChatMinimized);
+}
+
+function setupPanelInteractions(panel, handle, fab, toggleMinimized) {
+  if (handle instanceof HTMLElement) {
+    handle.addEventListener("mousedown", (event) => {
+      if (event.target instanceof HTMLElement && event.target.closest("button")) return;
+      if (event.button !== 0) return;
+      event.preventDefault();
+      startPanelDrag(panel, event);
+    });
+    handle.addEventListener("dblclick", (event) => {
+      event.preventDefault();
+      toggleMinimized();
+    });
+  }
+
+  if (fab instanceof HTMLElement) {
+    fab.addEventListener("mousedown", (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      if (fab === toolboxFab) {
+        setToolboxMinimized(false);
+      } else if (fab === chatFab) {
+        setChatMinimized(false);
+      }
+      startPanelDrag(panel, event);
+    });
+    fab.addEventListener("dblclick", (event) => {
+      event.preventDefault();
+      toggleMinimized();
+    });
+  }
+}
+
+setupPanelInteractions(toolbox, toolboxHandle, toolboxFab, toggleToolboxMinimized);
+setupPanelInteractions(chatPanel, chatHandle, chatFab, toggleChatMinimized);
+
+if (chatPanel instanceof HTMLElement) {
+  const right = window.innerWidth - chatPanel.getBoundingClientRect().right;
+  const safeRight = clamp(right, 0, window.innerWidth - chatPanel.offsetWidth);
+  chatPanel.style.left = `${window.innerWidth - chatPanel.offsetWidth - safeRight}px`;
+  chatPanel.style.right = "auto";
+  chatPanel.style.top = "16px";
+}
+
+if (toolbox instanceof HTMLElement) {
+  toolbox.style.left = "16px";
+  toolbox.style.top = "16px";
 }
 
 function setToolboxDrawingHidden(shouldHide) {
@@ -400,12 +464,7 @@ board.addEventListener("mouseover", (event) => {
 });
 
 window.addEventListener("mouseup", () => {
-  if (isDraggingToolbox) {
-    isDraggingToolbox = false;
-    if (toolbox instanceof HTMLElement) {
-      toolbox.classList.remove("is-dragging");
-    }
-  }
+  stopPanelDrag();
   if (isPanning) {
     isPanning = false;
     boardViewport.classList.remove("is-panning");
@@ -422,7 +481,7 @@ boardViewport.addEventListener("mousedown", (event) => {
 });
 
 window.addEventListener("mousemove", (event) => {
-  dragToolbox(event);
+  dragActivePanel(event);
   if (!isPanning) return;
   const deltaX = event.clientX - panStartX;
   const deltaY = event.clientY - panStartY;
@@ -430,50 +489,11 @@ window.addEventListener("mousemove", (event) => {
   boardViewport.scrollTop = panScrollTop - deltaY;
 });
 
-if (toolboxHandle instanceof HTMLElement) {
-  toolboxHandle.addEventListener("mousedown", (event) => {
-    if (event.target instanceof HTMLElement && event.target.closest("button")) return;
-    if (event.button !== 0) return;
-    event.preventDefault();
-    startToolboxDrag(event);
-  });
-}
-
-if (toolboxFab instanceof HTMLElement) {
-  toolboxFab.addEventListener("mousedown", (event) => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    setToolboxMinimized(false);
-    startToolboxDrag(event);
-  });
-
-  toolboxFab.addEventListener("mouseenter", () => {
-    clearMinimizeTimer();
-    setToolboxMinimized(false);
-  });
-
-  toolboxFab.addEventListener("focus", () => {
-    clearMinimizeTimer();
-    setToolboxMinimized(false);
-  });
-}
-
 if (autoHideBtn instanceof HTMLElement) {
   autoHideBtn.addEventListener("click", () => {
     shouldAutoHideToolbox = !shouldAutoHideToolbox;
     setToolboxDrawingHidden(false);
     syncToolboxButtons();
-  });
-}
-
-if (toolbox instanceof HTMLElement) {
-  toolbox.addEventListener("mouseenter", () => {
-    clearMinimizeTimer();
-    setToolboxMinimized(false);
-  });
-
-  toolbox.addEventListener("mouseleave", () => {
-    scheduleToolboxMinimize();
   });
 }
 
@@ -566,6 +586,7 @@ window.addEventListener("keyup", (event) => {
 renderState(latestState);
 setZoom(1);
 setToolboxMinimized(true);
+setChatMinimized(true);
 syncToolboxButtons();
 loadColorHistory();
 addColorToHistory(colorInput.value);
