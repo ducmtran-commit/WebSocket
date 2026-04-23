@@ -12,7 +12,8 @@
         <button id="toolboxFab" class="toolbox-fab" type="button" aria-label="Open toolbox">🎨</button>
         <div id="toolboxHandle" class="left-drag-handle">
           <span class="drag-title">Drag Toolbox</span>
-          <div class="toolbox-actions">
+          <div class="panel-actions">
+            <button id="undockToolboxBtn" type="button">Undock</button>
             <button id="autoHideBtn" type="button">Auto-hide: On</button>
           </div>
         </div>
@@ -51,6 +52,9 @@
         <button id="chatFab" class="toolbox-fab" type="button" aria-label="Open chat">💬</button>
         <div id="chatHandle" class="left-drag-handle">
           <span class="drag-title">Drag Chat</span>
+          <div class="panel-actions">
+            <button id="undockChatBtn" type="button">Undock</button>
+          </div>
         </div>
         <div class="chat-content">
           <div class="panel">
@@ -68,6 +72,9 @@
         <button id="artistsFab" class="toolbox-fab" type="button" aria-label="Open artists">👥</button>
         <div id="artistsHandle" class="left-drag-handle">
           <span class="drag-title">Drag Artists</span>
+          <div class="panel-actions">
+            <button id="undockArtistsBtn" type="button">Undock</button>
+          </div>
         </div>
         <div class="artists-content">
           <div class="panel">
@@ -76,6 +83,8 @@
           </div>
         </div>
       </section>
+
+      <button id="groupFab" class="toolbox-fab group-fab" type="button" aria-label="Panel folder">🧩</button>
 
       <section class="right">
         <div id="boardViewport" class="board-viewport">
