@@ -49,6 +49,7 @@ let shouldAutoHideToolbox = true;
 let workspaceDragging = false;
 let workspaceDragLastX = 0;
 let workspaceDragLastY = 0;
+let sectionReorder = null;
 const COLOR_HISTORY_KEY = "pixel-board-color-history";
 const MAX_COLOR_HISTORY = 10;
 let recentColors = [];
@@ -286,6 +287,67 @@ function jumpToSection(sectionId) {
   el.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+function startSectionReorder(section, clientY) {
+  if (!(workspaceScroll instanceof HTMLElement)) return;
+  const rect = section.getBoundingClientRect();
+  const placeholder = document.createElement("div");
+  placeholder.className = "section-reorder-placeholder";
+  placeholder.style.height = `${rect.height}px`;
+  workspaceScroll.insertBefore(placeholder, section);
+  section.classList.add("is-section-dragging");
+  section.style.position = "fixed";
+  section.style.left = `${rect.left}px`;
+  section.style.top = `${rect.top}px`;
+  section.style.width = `${rect.width}px`;
+  section.style.zIndex = "60";
+  section.style.marginBottom = "0";
+  sectionReorder = {
+    section,
+    placeholder,
+    width: rect.width,
+    lockLeft: rect.left,
+    offsetY: clientY - rect.top,
+  };
+}
+
+function moveSectionReorder(clientX, clientY) {
+  if (!sectionReorder || !(workspaceScroll instanceof HTMLElement)) return;
+  const { section, placeholder, width, lockLeft, offsetY } = sectionReorder;
+  section.style.left = `${lockLeft}px`;
+  section.style.top = `${clientY - offsetY}px`;
+  section.style.width = `${width}px`;
+
+  const others = [...workspaceScroll.querySelectorAll(".workspace-section")].filter((el) => el !== section);
+  let insertBefore = null;
+  for (const other of others) {
+    const r = other.getBoundingClientRect();
+    if (clientY < r.top + r.height / 2) {
+      insertBefore = other;
+      break;
+    }
+  }
+  if (insertBefore) {
+    workspaceScroll.insertBefore(placeholder, insertBefore);
+  } else {
+    workspaceScroll.appendChild(placeholder);
+  }
+}
+
+function stopSectionReorder() {
+  if (!sectionReorder || !(workspaceScroll instanceof HTMLElement)) return;
+  const { section, placeholder } = sectionReorder;
+  workspaceScroll.insertBefore(section, placeholder);
+  placeholder.remove();
+  section.classList.remove("is-section-dragging");
+  section.style.position = "";
+  section.style.left = "";
+  section.style.top = "";
+  section.style.width = "";
+  section.style.zIndex = "";
+  section.style.marginBottom = "";
+  sectionReorder = null;
+}
+
 if (workspaceHandle instanceof HTMLElement) {
   workspaceHandle.addEventListener("mousedown", (event) => {
     if (event.target instanceof HTMLElement && event.target.closest("button")) return;
@@ -320,6 +382,34 @@ document.querySelectorAll(".nav-jump").forEach((btn) => {
     if (id) jumpToSection(id);
   });
 });
+
+if (workspaceScroll instanceof HTMLElement) {
+  workspaceScroll.addEventListener("mousedown", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const handle = target.closest(".section-drag-handle");
+    if (!handle) return;
+    if (event.button !== 0) return;
+    const section = handle.closest(".workspace-section");
+    if (!(section instanceof HTMLElement)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    startSectionReorder(section, event.clientY);
+  });
+
+  workspaceScroll.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const btn = target.closest(".section-collapse-btn");
+    if (!btn) return;
+    const section = btn.closest(".workspace-section");
+    if (!(section instanceof HTMLElement)) return;
+    const collapsed = section.classList.toggle("section-collapsed");
+    btn.setAttribute("aria-expanded", String(!collapsed));
+    btn.setAttribute("aria-label", collapsed ? "Expand section" : "Collapse section");
+    btn.textContent = collapsed ? "▸" : "▾";
+  });
+}
 
 if (workspacePanel instanceof HTMLElement) {
   workspacePanel.style.left = "16px";
@@ -504,6 +594,7 @@ board.addEventListener("mouseover", (event) => {
 });
 
 window.addEventListener("mouseup", () => {
+  stopSectionReorder();
   stopWorkspaceDrag();
   if (isPanning) {
     isPanning = false;
@@ -519,7 +610,11 @@ boardViewport.addEventListener("mousedown", (event) => {
 });
 
 window.addEventListener("mousemove", (event) => {
-  dragWorkspace(event);
+  if (sectionReorder) {
+    moveSectionReorder(event.clientX, event.clientY);
+  } else {
+    dragWorkspace(event);
+  }
   if (isPainting && (event.buttons & 1) !== 1) {
     stopPainting();
   }
