@@ -25,6 +25,14 @@
           </nav>
           <div id="workspaceScroll" class="workspace-scroll">
             <section id="section-toolbox" class="workspace-section">
+              <div class="section-header">
+                <span class="section-drag-handle" title="Drag to reorder" aria-label="Drag to reorder"></span>
+                <span class="section-title">Tools</span>
+                <button type="button" class="section-collapse-btn" aria-expanded="true" aria-label="Collapse section">
+                  ▾
+                </button>
+              </div>
+              <div class="workspace-section-body">
               <h1>Co-op Pixel Board</h1>
               <p class="subtitle">Everyone paints the same board in real time.</p>
               <div class="panel">
@@ -52,21 +60,38 @@
                 <p id="statusText">Status: connecting...</p>
                 <p id="playersText">Artists online: 0</p>
               </div>
+              </div>
             </section>
             <section id="section-chat" class="workspace-section">
+              <div class="section-header">
+                <span class="section-drag-handle" title="Drag to reorder" aria-label="Drag to reorder"></span>
+                <span class="section-title">Chat</span>
+                <button type="button" class="section-collapse-btn" aria-expanded="true" aria-label="Collapse section">
+                  ▾
+                </button>
+              </div>
+              <div class="workspace-section-body">
               <div class="panel">
-                <h2>Chat</h2>
                 <div id="chatBox" class="chat-box"></div>
                 <div class="row">
                   <input id="chatInput" type="text" maxlength="120" placeholder="Say something..." />
                   <button id="sendChatBtn">Send</button>
                 </div>
               </div>
+              </div>
             </section>
             <section id="section-artists" class="workspace-section">
+              <div class="section-header">
+                <span class="section-drag-handle" title="Drag to reorder" aria-label="Drag to reorder"></span>
+                <span class="section-title">Artists</span>
+                <button type="button" class="section-collapse-btn" aria-expanded="true" aria-label="Collapse section">
+                  ▾
+                </button>
+              </div>
+              <div class="workspace-section-body">
               <div class="panel">
-                <h3>Artists Online</h3>
                 <ul id="userList"></ul>
+              </div>
               </div>
             </section>
           </div>
