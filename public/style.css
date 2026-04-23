@@ -146,6 +146,10 @@ body {
 }
 
 .floating-panel.minimized .toolbox-fab {
+  display: none;
+}
+
+body.customized-layout .floating-panel.minimized .toolbox-fab {
   display: block;
 }
 
@@ -159,6 +163,10 @@ body {
 }
 
 .group-fab.visible {
+  display: none;
+}
+
+body.customized-layout .group-fab.visible {
   display: block;
 }
 
