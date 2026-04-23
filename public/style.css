@@ -217,6 +217,8 @@ input {
   padding: 8px;
   width: max-content;
   min-width: max-content;
+  transform-origin: top left;
+  will-change: transform;
 }
 
 .board-viewport {
