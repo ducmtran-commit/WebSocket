@@ -262,16 +262,20 @@ function toggleChatMinimized() {
 }
 
 function setupPanelInteractions(panel, handle, fab, toggleMinimized) {
+  if (panel instanceof HTMLElement) {
+    panel.addEventListener("dblclick", (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      toggleMinimized();
+    });
+  }
+
   if (handle instanceof HTMLElement) {
     handle.addEventListener("mousedown", (event) => {
       if (event.target instanceof HTMLElement && event.target.closest("button")) return;
       if (event.button !== 0) return;
       event.preventDefault();
       startPanelDrag(panel, event);
-    });
-    handle.addEventListener("dblclick", (event) => {
-      event.preventDefault();
-      toggleMinimized();
     });
   }
 
@@ -285,10 +289,6 @@ function setupPanelInteractions(panel, handle, fab, toggleMinimized) {
         setChatMinimized(false);
       }
       startPanelDrag(panel, event);
-    });
-    fab.addEventListener("dblclick", (event) => {
-      event.preventDefault();
-      toggleMinimized();
     });
   }
 }
