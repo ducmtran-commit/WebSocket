@@ -56,11 +56,42 @@ body {
   color: #cbd5e1;
   background: #111827;
   font-size: 0.85rem;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.drag-title {
+  font-weight: 700;
+}
+
+.toolbox-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.toolbox-actions button {
+  padding: 4px 8px;
+  font-size: 0.8rem;
 }
 
 .left.is-dragging {
   user-select: none;
+}
+
+.left.minimized {
+  width: auto;
+  max-width: calc(100vw - 32px);
+}
+
+.left.minimized .toolbox-content {
+  display: none;
+}
+
+.left.auto-hidden .toolbox-content {
+  opacity: 0;
+  pointer-events: none;
 }
 
 #toolText {
