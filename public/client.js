@@ -19,7 +19,7 @@ const sendChatBtn = document.getElementById("sendChatBtn");
 const colorHistory = document.getElementById("colorHistory");
 const toolbox = document.querySelector(".left");
 const toolboxHandle = document.getElementById("toolboxHandle");
-const toggleToolboxBtn = document.getElementById("toggleToolboxBtn");
+const toolboxFab = document.getElementById("toolboxFab");
 const autoHideBtn = document.getElementById("autoHideBtn");
 
 let ws;
@@ -44,6 +44,7 @@ let toolboxDragOffsetX = 0;
 let toolboxDragOffsetY = 0;
 let isToolboxMinimized = false;
 let shouldAutoHideToolbox = true;
+let minimizeTimer = null;
 const COLOR_HISTORY_KEY = "pixel-board-color-history";
 const MAX_COLOR_HISTORY = 10;
 let recentColors = [];
@@ -211,11 +212,11 @@ function dragToolbox(event) {
 }
 
 function syncToolboxButtons() {
-  if (toggleToolboxBtn instanceof HTMLElement) {
-    toggleToolboxBtn.textContent = isToolboxMinimized ? "Expand" : "Minimize";
-  }
   if (autoHideBtn instanceof HTMLElement) {
     autoHideBtn.textContent = `Auto-hide: ${shouldAutoHideToolbox ? "On" : "Off"}`;
+  }
+  if (toolboxFab instanceof HTMLElement) {
+    toolboxFab.setAttribute("aria-label", isToolboxMinimized ? "Open toolbox" : "Toolbox");
   }
 }
 
@@ -228,6 +229,20 @@ function setToolboxMinimized(nextState) {
     }
   }
   syncToolboxButtons();
+}
+
+function clearMinimizeTimer() {
+  if (!minimizeTimer) return;
+  window.clearTimeout(minimizeTimer);
+  minimizeTimer = null;
+}
+
+function scheduleToolboxMinimize() {
+  clearMinimizeTimer();
+  minimizeTimer = window.setTimeout(() => {
+    if (isDraggingToolbox || isPainting) return;
+    setToolboxMinimized(true);
+  }, 280);
 }
 
 function setToolboxDrawingHidden(shouldHide) {
@@ -424,9 +439,22 @@ if (toolboxHandle instanceof HTMLElement) {
   });
 }
 
-if (toggleToolboxBtn instanceof HTMLElement) {
-  toggleToolboxBtn.addEventListener("click", () => {
-    setToolboxMinimized(!isToolboxMinimized);
+if (toolboxFab instanceof HTMLElement) {
+  toolboxFab.addEventListener("mousedown", (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    setToolboxMinimized(false);
+    startToolboxDrag(event);
+  });
+
+  toolboxFab.addEventListener("mouseenter", () => {
+    clearMinimizeTimer();
+    setToolboxMinimized(false);
+  });
+
+  toolboxFab.addEventListener("focus", () => {
+    clearMinimizeTimer();
+    setToolboxMinimized(false);
   });
 }
 
@@ -435,6 +463,17 @@ if (autoHideBtn instanceof HTMLElement) {
     shouldAutoHideToolbox = !shouldAutoHideToolbox;
     setToolboxDrawingHidden(false);
     syncToolboxButtons();
+  });
+}
+
+if (toolbox instanceof HTMLElement) {
+  toolbox.addEventListener("mouseenter", () => {
+    clearMinimizeTimer();
+    setToolboxMinimized(false);
+  });
+
+  toolbox.addEventListener("mouseleave", () => {
+    scheduleToolboxMinimize();
   });
 }
 
@@ -526,6 +565,7 @@ window.addEventListener("keyup", (event) => {
 
 renderState(latestState);
 setZoom(1);
+setToolboxMinimized(true);
 syncToolboxButtons();
 loadColorHistory();
 addColorToHistory(colorInput.value);
