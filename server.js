@@ -84,6 +84,26 @@ function broadcastPixelsUpdated(pixels) {
   });
 }
 
+const paintBroadcastMerge = new Map();
+let paintBroadcastTimer = null;
+
+function flushPaintBroadcastMerge() {
+  paintBroadcastTimer = null;
+  if (paintBroadcastMerge.size === 0) return;
+  const pixels = Array.from(paintBroadcastMerge.values());
+  paintBroadcastMerge.clear();
+  broadcastPixelsUpdated(pixels);
+}
+
+function mergePaintBroadcastPixels(updates) {
+  for (const u of updates) {
+    paintBroadcastMerge.set(`${u.x},${u.y}`, u);
+  }
+  if (paintBroadcastTimer == null) {
+    paintBroadcastTimer = setTimeout(flushPaintBroadcastMerge, 20);
+  }
+}
+
 function addChat(author, text, authorId = null) {
   state.chat.push({ author, authorId, text, at: Date.now() });
   if (state.chat.length > 30) state.chat.shift();
@@ -151,7 +171,7 @@ wss.on("connection", (ws) => {
         updates.push({ x, y, color });
       }
       if (changes.length > 0) {
-        broadcastPixelsUpdated(updates);
+        mergePaintBroadcastPixels(updates);
         ws.undoStack.push({ changes });
         if (ws.undoStack.length > 80) ws.undoStack.shift();
         ws.redoStack = [];
