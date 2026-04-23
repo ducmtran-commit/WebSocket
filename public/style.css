@@ -8,6 +8,7 @@ body {
   background: #0f172a;
   color: #e2e8f0;
   min-height: 100vh;
+  overflow: hidden;
 }
 
 .layout {
@@ -233,6 +234,12 @@ input {
   border: 1px solid #334155;
   border-radius: 10px;
   cursor: grab;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.board-viewport::-webkit-scrollbar {
+  display: none;
 }
 
 .board-viewport.is-panning {
