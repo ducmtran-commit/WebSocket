@@ -29,6 +29,12 @@ let zoomLevel = 1;
 let cellEls = [];
 const pendingPixels = new Map();
 let flushTimer = null;
+let isPanning = false;
+let panStartX = 0;
+let panStartY = 0;
+let panScrollLeft = 0;
+let panScrollTop = 0;
+let isSpaceHeld = false;
 const COLOR_HISTORY_KEY = "pixel-board-color-history";
 const MAX_COLOR_HISTORY = 10;
 let recentColors = [];
@@ -153,6 +159,22 @@ function setZoom(nextZoom) {
   zoomInput.value = String(clamped);
   zoomText.textContent = `Zoom: ${Math.round(clamped * 100)}%`;
   createBoard(latestState);
+}
+
+function shouldStartPanning(event) {
+  const isMiddleOrRight = event.button === 1 || event.button === 2;
+  const isSpaceAndLeft = isSpaceHeld && event.button === 0;
+  return isMiddleOrRight || isSpaceAndLeft;
+}
+
+function startPanning(event) {
+  isPanning = true;
+  isPainting = false;
+  panStartX = event.clientX;
+  panStartY = event.clientY;
+  panScrollLeft = boardViewport.scrollLeft;
+  panScrollTop = boardViewport.scrollTop;
+  boardViewport.classList.add("is-panning");
 }
 
 function renderChat(chat) {
@@ -286,6 +308,8 @@ function scheduleFlush() {
 }
 
 board.addEventListener("mousedown", (event) => {
+  if (shouldStartPanning(event)) return;
+  if (event.button !== 0) return;
   isPainting = true;
   paintCellFromEvent(event);
   scheduleFlush();
@@ -298,8 +322,31 @@ board.addEventListener("mouseover", (event) => {
 });
 
 window.addEventListener("mouseup", () => {
+  if (isPanning) {
+    isPanning = false;
+    boardViewport.classList.remove("is-panning");
+  }
   isPainting = false;
   flushPaintBatch();
+});
+
+boardViewport.addEventListener("mousedown", (event) => {
+  if (!shouldStartPanning(event)) return;
+  event.preventDefault();
+  startPanning(event);
+});
+
+window.addEventListener("mousemove", (event) => {
+  if (!isPanning) return;
+  const deltaX = event.clientX - panStartX;
+  const deltaY = event.clientY - panStartY;
+  boardViewport.scrollLeft = panScrollLeft - deltaX;
+  boardViewport.scrollTop = panScrollTop - deltaY;
+});
+
+boardViewport.addEventListener("contextmenu", (event) => {
+  if (!isPanning) return;
+  event.preventDefault();
 });
 
 setNameBtn.addEventListener("click", () => {
@@ -354,6 +401,10 @@ chatInput.addEventListener("keydown", (event) => {
 });
 
 window.addEventListener("keydown", (event) => {
+  if (event.code === "Space" && shouldHandleCanvasShortcut(event)) {
+    isSpaceHeld = true;
+    event.preventDefault();
+  }
   if (!shouldHandleCanvasShortcut(event)) return;
   const isCmdOrCtrl = event.ctrlKey || event.metaKey;
   if (!isCmdOrCtrl) return;
@@ -373,8 +424,14 @@ window.addEventListener("keydown", (event) => {
   }
 });
 
+window.addEventListener("keyup", (event) => {
+  if (event.code === "Space") {
+    isSpaceHeld = false;
+  }
+});
+
 renderState(latestState);
-setZoom(0.7);
+setZoom(1);
 loadColorHistory();
 addColorToHistory(colorInput.value);
 connect();
