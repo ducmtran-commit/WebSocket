@@ -44,6 +44,7 @@ body {
   border-radius: 12px;
   background: rgba(15, 23, 42, 0.95);
   backdrop-filter: blur(4px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
 .left-drag-handle {
@@ -81,17 +82,42 @@ body {
 }
 
 .left.minimized {
-  width: auto;
-  max-width: calc(100vw - 32px);
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  min-height: 52px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  overflow: visible;
+  backdrop-filter: none;
 }
 
-.left.minimized .toolbox-content {
+.left.minimized .toolbox-content,
+.left.minimized .left-drag-handle {
   display: none;
 }
 
 .left.auto-hidden .toolbox-content {
   opacity: 0;
   pointer-events: none;
+}
+
+.toolbox-fab {
+  display: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid #475569;
+  background: #111827;
+  color: #e2e8f0;
+  font-size: 1.35rem;
+  padding: 0;
+  box-shadow: 0 6px 20px rgba(2, 6, 23, 0.5);
+}
+
+.left.minimized .toolbox-fab {
+  display: block;
 }
 
 #toolText {
