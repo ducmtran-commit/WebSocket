@@ -18,6 +18,7 @@ app.get("/health", (_req, res) => res.status(200).send("ok"));
 const state = {
   users: new Map(),
   pixels: Array.from({ length: GRID_HEIGHT }, () => Array(GRID_WIDTH).fill(DEFAULT_PIXEL)),
+  owners: Array.from({ length: GRID_HEIGHT }, () => Array(GRID_WIDTH).fill(null)),
   chat: [],
 };
 
@@ -76,20 +77,10 @@ function broadcastChat() {
   });
 }
 
-function broadcastPixelUpdate(x, y, color) {
+function broadcastPixelsUpdated(pixels) {
   broadcast({
-    type: "pixel-update",
-    x,
-    y,
-    color,
-  });
-}
-
-function broadcastBoardCleared() {
-  broadcast({
-    type: "board-cleared",
-    gridWidth: GRID_WIDTH,
-    gridHeight: GRID_HEIGHT,
+    type: "pixels-updated",
+    pixels,
   });
 }
 
@@ -140,6 +131,7 @@ wss.on("connection", (ws) => {
       if (!Array.isArray(msg.pixels) || msg.pixels.length === 0) return;
       const seen = new Set();
       const changes = [];
+      const updates = [];
       for (const item of msg.pixels) {
         const x = Number(item?.x);
         const y = Number(item?.y);
@@ -151,12 +143,15 @@ wss.on("connection", (ws) => {
         if (seen.has(key)) continue;
         seen.add(key);
         const prevColor = state.pixels[y][x];
+        const prevOwner = state.owners[y][x];
         if (prevColor === color) continue;
-        changes.push({ x, y, from: prevColor, to: color });
+        changes.push({ x, y, from: prevColor, to: color, fromOwner: prevOwner, toOwner: ws.userId });
         state.pixels[y][x] = color;
-        broadcastPixelUpdate(x, y, color);
+        state.owners[y][x] = ws.userId;
+        updates.push({ x, y, color });
       }
       if (changes.length > 0) {
+        broadcastPixelsUpdated(updates);
         ws.undoStack.push({ changes });
         if (ws.undoStack.length > 80) ws.undoStack.shift();
         ws.redoStack = [];
@@ -167,10 +162,13 @@ wss.on("connection", (ws) => {
     if (msg.type === "undo") {
       const action = ws.undoStack.pop();
       if (!action) return;
+      const updates = [];
       for (const change of action.changes) {
         state.pixels[change.y][change.x] = change.from;
-        broadcastPixelUpdate(change.x, change.y, change.from);
+        state.owners[change.y][change.x] = change.fromOwner || null;
+        updates.push({ x: change.x, y: change.y, color: change.from });
       }
+      broadcastPixelsUpdated(updates);
       ws.redoStack.push(action);
       if (ws.redoStack.length > 80) ws.redoStack.shift();
       return;
@@ -179,21 +177,34 @@ wss.on("connection", (ws) => {
     if (msg.type === "redo") {
       const action = ws.redoStack.pop();
       if (!action) return;
+      const updates = [];
       for (const change of action.changes) {
         state.pixels[change.y][change.x] = change.to;
-        broadcastPixelUpdate(change.x, change.y, change.to);
+        state.owners[change.y][change.x] = change.toOwner || null;
+        updates.push({ x: change.x, y: change.y, color: change.to });
       }
+      broadcastPixelsUpdated(updates);
       ws.undoStack.push(action);
       if (ws.undoStack.length > 80) ws.undoStack.shift();
       return;
     }
 
     if (msg.type === "clear-board") {
-      state.pixels = Array.from({ length: GRID_HEIGHT }, () => Array(GRID_WIDTH).fill(DEFAULT_PIXEL));
+      const updates = [];
+      for (let y = 0; y < GRID_HEIGHT; y += 1) {
+        for (let x = 0; x < GRID_WIDTH; x += 1) {
+          if (state.owners[y][x] !== ws.userId) continue;
+          state.pixels[y][x] = DEFAULT_PIXEL;
+          state.owners[y][x] = null;
+          updates.push({ x, y, color: DEFAULT_PIXEL });
+        }
+      }
+      if (updates.length > 0) {
+        broadcastPixelsUpdated(updates);
+      }
       ws.undoStack = [];
       ws.redoStack = [];
-      addChat("System", `${current.name} cleared the board.`);
-      broadcastBoardCleared();
+      addChat("System", `${current.name} cleared their drawing.`);
       broadcastChat();
       return;
     }
