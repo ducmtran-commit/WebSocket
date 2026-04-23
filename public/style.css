@@ -45,7 +45,7 @@ body {
 .workspace-panel {
   top: 16px;
   left: 16px;
-  width: min(440px, calc(100vw - 32px));
+  width: min(460px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
   padding: 12px;
   display: flex;
@@ -95,85 +95,12 @@ body {
   gap: 0;
 }
 
-.workspace-align-row {
-  display: grid;
-  grid-template-columns: 76px minmax(0, 1fr);
-  gap: 10px;
-  align-items: stretch;
+.workspace-section-row {
   margin-bottom: 12px;
 }
 
-.workspace-section-row .workspace-nav-cell {
-  justify-content: center;
-}
-
-.workspace-align-row:last-child {
+.workspace-section-row:last-child {
   margin-bottom: 0;
-}
-
-.workspace-align-row--controls {
-  align-items: center;
-}
-
-.workspace-align-row--controls .workspace-nav-cell--scroll {
-  padding: 0;
-  border: none;
-  background: transparent;
-  align-items: center;
-}
-
-.workspace-nav-cell .nav-scroll-btn {
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  padding: 0;
-  flex-shrink: 0;
-  border-radius: 10px;
-  border: 1px solid #64748b;
-  background: #0f172a;
-  color: #f1f5f9;
-  font-size: 1rem;
-  font-weight: 400;
-  line-height: 1;
-  box-shadow: inset 0 0 0 1px rgba(51, 65, 85, 0.95);
-  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
-}
-
-.workspace-nav-cell .nav-scroll-btn:hover {
-  border-color: #94a3b8;
-  background: #111827;
-  color: #fff;
-}
-
-.workspace-nav-cell .nav-scroll-btn:active {
-  background: #020617;
-}
-
-.workspace-nav-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start;
-  padding: 6px;
-  border: 1px solid #334155;
-  border-radius: 10px;
-  background: #111827;
-}
-
-.workspace-align-row--controls .workspace-nav-cell {
-  justify-content: center;
-}
-
-.workspace-nav-cell .nav-jump {
-  width: 100%;
-  padding: 8px 4px;
-  text-align: center;
-  font-size: 0.75rem;
-  line-height: 1.15;
-}
-
-.workspace-content-cell {
-  min-width: 0;
 }
 
 .workspace-section {
@@ -187,22 +114,12 @@ body {
 }
 
 .workspace-section-placeholder {
-  display: grid;
-  grid-template-columns: 76px minmax(0, 1fr);
-  gap: 10px;
-  align-items: stretch;
   margin-bottom: 12px;
   pointer-events: none;
 }
 
-.workspace-section-placeholder .workspace-content-cell {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
 .workspace-section-placeholder-dash {
-  flex: 1;
+  width: 100%;
   min-height: 48px;
   border: 2px dashed #475569;
   border-radius: 10px;
@@ -456,7 +373,7 @@ input {
 
 @media (max-width: 920px) {
   .workspace-panel {
-    width: min(360px, calc(100vw - 24px));
+    width: min(380px, calc(100vw - 24px));
     top: 12px;
     left: 12px;
     max-height: calc(100vh - 24px);
