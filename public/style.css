@@ -92,6 +92,13 @@ body {
   font-size: 0.8rem;
 }
 
+#toggleChatBtn,
+#toggleArtistsBtn {
+  min-width: 30px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .floating-panel.is-dragging {
   user-select: none;
 }
