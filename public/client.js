@@ -17,6 +17,8 @@ const chatBox = document.getElementById("chatBox");
 const chatInput = document.getElementById("chatInput");
 const sendChatBtn = document.getElementById("sendChatBtn");
 const colorHistory = document.getElementById("colorHistory");
+const toolbox = document.querySelector(".left");
+const toolboxHandle = document.getElementById("toolboxHandle");
 
 let ws;
 let reconnectAttempts = 0;
@@ -35,6 +37,9 @@ let panStartY = 0;
 let panScrollLeft = 0;
 let panScrollTop = 0;
 let isSpaceHeld = false;
+let isDraggingToolbox = false;
+let toolboxDragOffsetX = 0;
+let toolboxDragOffsetY = 0;
 const COLOR_HISTORY_KEY = "pixel-board-color-history";
 const MAX_COLOR_HISTORY = 10;
 let recentColors = [];
@@ -175,6 +180,30 @@ function startPanning(event) {
   panScrollLeft = boardViewport.scrollLeft;
   panScrollTop = boardViewport.scrollTop;
   boardViewport.classList.add("is-panning");
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function startToolboxDrag(event) {
+  if (!(toolbox instanceof HTMLElement)) return;
+  isDraggingToolbox = true;
+  const rect = toolbox.getBoundingClientRect();
+  toolboxDragOffsetX = event.clientX - rect.left;
+  toolboxDragOffsetY = event.clientY - rect.top;
+  toolbox.classList.add("is-dragging");
+}
+
+function dragToolbox(event) {
+  if (!isDraggingToolbox) return;
+  if (!(toolbox instanceof HTMLElement)) return;
+  const maxLeft = window.innerWidth - toolbox.offsetWidth;
+  const maxTop = window.innerHeight - toolbox.offsetHeight;
+  const nextLeft = clamp(event.clientX - toolboxDragOffsetX, 0, Math.max(0, maxLeft));
+  const nextTop = clamp(event.clientY - toolboxDragOffsetY, 0, Math.max(0, maxTop));
+  toolbox.style.left = `${nextLeft}px`;
+  toolbox.style.top = `${nextTop}px`;
 }
 
 function renderChat(chat) {
@@ -322,6 +351,12 @@ board.addEventListener("mouseover", (event) => {
 });
 
 window.addEventListener("mouseup", () => {
+  if (isDraggingToolbox) {
+    isDraggingToolbox = false;
+    if (toolbox instanceof HTMLElement) {
+      toolbox.classList.remove("is-dragging");
+    }
+  }
   if (isPanning) {
     isPanning = false;
     boardViewport.classList.remove("is-panning");
@@ -337,12 +372,21 @@ boardViewport.addEventListener("mousedown", (event) => {
 });
 
 window.addEventListener("mousemove", (event) => {
+  dragToolbox(event);
   if (!isPanning) return;
   const deltaX = event.clientX - panStartX;
   const deltaY = event.clientY - panStartY;
   boardViewport.scrollLeft = panScrollLeft - deltaX;
   boardViewport.scrollTop = panScrollTop - deltaY;
 });
+
+if (toolboxHandle instanceof HTMLElement) {
+  toolboxHandle.addEventListener("mousedown", (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    startToolboxDrag(event);
+  });
+}
 
 boardViewport.addEventListener("contextmenu", (event) => {
   if (!isPanning) return;
