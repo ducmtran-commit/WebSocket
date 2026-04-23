@@ -415,6 +415,8 @@ input {
   min-width: max-content;
   transform-origin: top left;
   will-change: transform;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .board-viewport {
@@ -443,6 +445,8 @@ input {
   border-radius: 2px;
   background: #0b1220;
   cursor: crosshair;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 #userList {
