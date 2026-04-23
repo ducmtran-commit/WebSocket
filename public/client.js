@@ -32,6 +32,7 @@ let latestState = { gridWidth: 256, gridHeight: 192, pixels: [], users: [], chat
 let isPainting = false;
 let isErasing = false;
 const ERASE_COLOR = "#0b1220";
+const BASE_PIXEL_SIZE = 10;
 let zoomLevel = 1;
 let cellEls = [];
 const pendingPixels = new Map();
@@ -132,9 +133,8 @@ function shouldHandleCanvasShortcut(event) {
 function createBoard(state) {
   board.innerHTML = "";
   cellEls = Array.from({ length: state.gridHeight }, () => Array(state.gridWidth).fill(null));
-  const pixelSize = Math.max(6, Math.round(14 * zoomLevel));
-  board.style.gridTemplateColumns = `repeat(${state.gridWidth}, ${pixelSize}px)`;
-  board.style.gridAutoRows = `${pixelSize}px`;
+  board.style.gridTemplateColumns = `repeat(${state.gridWidth}, ${BASE_PIXEL_SIZE}px)`;
+  board.style.gridAutoRows = `${BASE_PIXEL_SIZE}px`;
 
   for (let y = 0; y < state.gridHeight; y += 1) {
     for (let x = 0; x < state.gridWidth; x += 1) {
@@ -167,11 +167,11 @@ function clearBoardLocal() {
 }
 
 function setZoom(nextZoom) {
-  const clamped = Math.min(2.5, Math.max(0.5, Number(nextZoom)));
+  const clamped = Math.min(2, Math.max(0.5, Number(nextZoom)));
   zoomLevel = clamped;
   zoomInput.value = String(clamped);
   zoomText.textContent = `Zoom: ${Math.round(clamped * 100)}%`;
-  createBoard(latestState);
+  board.style.transform = `scale(${zoomLevel})`;
 }
 
 function shouldStartPanning(event) {
@@ -584,7 +584,7 @@ window.addEventListener("keyup", (event) => {
 });
 
 renderState(latestState);
-setZoom(1);
+setZoom(0.9);
 setToolboxMinimized(true);
 setChatMinimized(true);
 syncToolboxButtons();
