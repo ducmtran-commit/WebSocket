@@ -69,6 +69,11 @@ let activeDragGroup = [];
 const panelLinks = new Map();
 const PANEL_DOCK_GAP = 10;
 let isLayoutCustomized = false;
+let isGroupFabDragging = false;
+let groupFabMoved = false;
+let groupFabOffsetX = 0;
+let groupFabOffsetY = 0;
+let hideGroupFabForRearrange = false;
 const COLOR_HISTORY_KEY = "pixel-board-color-history";
 const MAX_COLOR_HISTORY = 10;
 let recentColors = [];
@@ -293,6 +298,11 @@ function markLayoutCustomized() {
   updateGroupFabVisibility();
 }
 
+function markPanelsRearranged() {
+  hideGroupFabForRearrange = true;
+  updateGroupFabVisibility();
+}
+
 function setToolboxMinimized(nextState) {
   if (nextState) {
     markLayoutCustomized();
@@ -333,6 +343,7 @@ function dragActivePanel(event) {
   if (!(activeDraggedPanel instanceof HTMLElement)) return;
   panelDragMoved = true;
   markLayoutCustomized();
+  markPanelsRearranged();
   const deltaX = event.clientX - dragLastX;
   const deltaY = event.clientY - dragLastY;
   dragLastX = event.clientX;
@@ -403,6 +414,7 @@ function linkPanels(a, b) {
 function unlinkPanel(panel) {
   if (!(panel instanceof HTMLElement)) return;
   markLayoutCustomized();
+  markPanelsRearranged();
   const links = panelLinks.get(panel);
   if (!links) return;
   links.forEach((neighbor) => {
@@ -425,7 +437,8 @@ function hasAnyLinkedPanels() {
 
 function updateGroupFabVisibility() {
   if (!(groupFab instanceof HTMLElement)) return;
-  groupFab.classList.toggle("visible", hasAnyLinkedPanels() && isLayoutCustomized);
+  const shouldShow = hasAnyLinkedPanels() && isLayoutCustomized && !hideGroupFabForRearrange;
+  groupFab.classList.toggle("visible", shouldShow);
 }
 
 function getLinkedPanelGroup(start) {
@@ -646,7 +659,21 @@ if (toggleArtistsBtn instanceof HTMLElement) {
 }
 
 if (groupFab instanceof HTMLElement) {
+  groupFab.addEventListener("mousedown", (event) => {
+    if (event.button !== 0) return;
+    isGroupFabDragging = true;
+    groupFabMoved = false;
+    const rect = groupFab.getBoundingClientRect();
+    groupFabOffsetX = event.clientX - rect.left;
+    groupFabOffsetY = event.clientY - rect.top;
+    event.preventDefault();
+  });
+
   groupFab.addEventListener("click", () => {
+    if (groupFabMoved) {
+      groupFabMoved = false;
+      return;
+    }
     const shouldOpenAll = isToolboxMinimized || isChatMinimized || isArtistsMinimized;
     setToolboxMinimized(!shouldOpenAll);
     setChatMinimized(!shouldOpenAll);
@@ -832,6 +859,9 @@ board.addEventListener("mouseover", (event) => {
 
 window.addEventListener("mouseup", () => {
   stopPanelDrag();
+  if (isGroupFabDragging) {
+    isGroupFabDragging = false;
+  }
   if (isPanning) {
     isPanning = false;
     boardViewport.classList.remove("is-panning");
@@ -847,6 +877,16 @@ boardViewport.addEventListener("mousedown", (event) => {
 
 window.addEventListener("mousemove", (event) => {
   dragActivePanel(event);
+  if (isGroupFabDragging && groupFab instanceof HTMLElement) {
+    const maxLeft = window.innerWidth - groupFab.offsetWidth;
+    const maxTop = window.innerHeight - groupFab.offsetHeight;
+    const nextLeft = clamp(event.clientX - groupFabOffsetX, 0, Math.max(0, maxLeft));
+    const nextTop = clamp(event.clientY - groupFabOffsetY, 0, Math.max(0, maxTop));
+    groupFab.style.left = `${nextLeft}px`;
+    groupFab.style.top = `${nextTop}px`;
+    groupFab.style.transform = "none";
+    groupFabMoved = true;
+  }
   if (isPainting && (event.buttons & 1) !== 1) {
     stopPainting();
   }
