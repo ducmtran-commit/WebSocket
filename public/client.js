@@ -32,7 +32,9 @@ let latestState = { gridWidth: 256, gridHeight: 192, pixels: [], users: [], chat
 let isPainting = false;
 let isErasing = false;
 const ERASE_COLOR = "#0b1220";
-const BASE_PIXEL_SIZE = 10;
+const BASE_PIXEL_SIZE = 8;
+const MIN_ZOOM = 0.7;
+const MAX_ZOOM = 1.4;
 let zoomLevel = 1;
 let cellEls = [];
 const pendingPixels = new Map();
@@ -168,12 +170,28 @@ function clearBoardLocal() {
   }
 }
 
-function setZoom(nextZoom) {
-  const clamped = Math.min(2, Math.max(0.5, Number(nextZoom)));
+function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
+  const prevZoom = zoomLevel;
+  const clamped = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number(nextZoom)));
+  if (!Number.isFinite(clamped)) return;
+
+  const viewportRect = boardViewport.getBoundingClientRect();
+  const anchorX =
+    typeof anchorClientX === "number" ? anchorClientX - viewportRect.left : boardViewport.clientWidth / 2;
+  const anchorY =
+    typeof anchorClientY === "number" ? anchorClientY - viewportRect.top : boardViewport.clientHeight / 2;
+  const worldX = (boardViewport.scrollLeft + anchorX) / prevZoom;
+  const worldY = (boardViewport.scrollTop + anchorY) / prevZoom;
+
   zoomLevel = clamped;
   zoomInput.value = String(clamped);
   zoomText.textContent = `Zoom: ${Math.round(clamped * 100)}%`;
   board.style.transform = `scale(${zoomLevel})`;
+
+  const nextScrollLeft = worldX * zoomLevel - anchorX;
+  const nextScrollTop = worldY * zoomLevel - anchorY;
+  boardViewport.scrollLeft = Math.max(0, nextScrollLeft);
+  boardViewport.scrollTop = Math.max(0, nextScrollTop);
 }
 
 function shouldStartPanning(event) {
@@ -578,11 +596,11 @@ zoomInput.addEventListener("input", () => {
 });
 
 zoomOutBtn.addEventListener("click", () => {
-  setZoom(zoomLevel - 0.1);
+  setZoom(zoomLevel - 0.05);
 });
 
 zoomInBtn.addEventListener("click", () => {
-  setZoom(zoomLevel + 0.1);
+  setZoom(zoomLevel + 0.05);
 });
 
 colorInput.addEventListener("change", () => {
@@ -592,8 +610,8 @@ colorInput.addEventListener("change", () => {
 board.addEventListener("wheel", (event) => {
   if (!event.ctrlKey) return;
   event.preventDefault();
-  const step = event.deltaY < 0 ? 0.1 : -0.1;
-  setZoom(zoomLevel + step);
+  const step = event.deltaY < 0 ? 0.05 : -0.05;
+  setZoom(zoomLevel + step, event.clientX, event.clientY);
 });
 
 sendChatBtn.addEventListener("click", () => {
