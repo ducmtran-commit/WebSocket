@@ -225,8 +225,6 @@ function setToolboxMinimized(nextState) {
     toolbox.classList.toggle("minimized", isToolboxMinimized);
     if (isToolboxMinimized) {
       toolbox.classList.remove("auto-hidden");
-    } else {
-      fitPanelIntoViewport(toolbox);
     }
   }
   syncToolboxButtons();
@@ -236,9 +234,6 @@ function setChatMinimized(nextState) {
   isChatMinimized = nextState;
   if (chatPanel instanceof HTMLElement) {
     chatPanel.classList.toggle("minimized", isChatMinimized);
-    if (!isChatMinimized) {
-      fitPanelIntoViewport(chatPanel);
-    }
   }
   syncToolboxButtons();
 }
@@ -272,6 +267,13 @@ function fitPanelIntoViewport(panel) {
   panel.style.left = `${clamp(currentLeft, 0, maxLeft)}px`;
   panel.style.top = `${clamp(currentTop, 0, maxTop)}px`;
   panel.style.right = "auto";
+}
+
+function centerBoardViewport() {
+  const maxLeft = Math.max(0, boardViewport.scrollWidth - boardViewport.clientWidth);
+  const maxTop = Math.max(0, boardViewport.scrollHeight - boardViewport.clientHeight);
+  boardViewport.scrollLeft = Math.round(maxLeft / 2);
+  boardViewport.scrollTop = Math.round(maxTop / 2);
 }
 
 function toggleToolboxMinimized() {
@@ -385,6 +387,9 @@ function renderState(state) {
   latestState = state;
   playersText.textContent = `Artists online: ${state.users.length}`;
   createBoard(state);
+  window.requestAnimationFrame(() => {
+    centerBoardViewport();
+  });
   renderChat(state.chat);
   renderUsers(state.users);
 }
