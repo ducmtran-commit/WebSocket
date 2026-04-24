@@ -261,6 +261,8 @@ wss.on("connection", (ws) => {
 
   state.users.set(userId, user);
   ws.userId = userId;
+  /** Stable paint/clear identity; client sends `clientKey` in set-name to survive refresh. */
+  ws.ownerKey = userId;
   ws.undoStack = [];
   ws.redoStack = [];
 
@@ -269,6 +271,13 @@ wss.on("connection", (ws) => {
   broadcastUsers();
   broadcastChat();
   touchBoardActivity();
+
+  function sanitizeClientKey(value) {
+    if (typeof value !== "string") return null;
+    const s = value.trim().slice(0, 64);
+    if (s.length < 8 || s.length > 64) return null;
+    return /^[a-zA-Z0-9_-]+$/.test(s) ? s : null;
+  }
 
   ws.on("message", (raw) => {
     let msg;
@@ -284,6 +293,8 @@ wss.on("connection", (ws) => {
 
     if (msg.type === "set-name") {
       current.name = safeName(msg.name);
+      const key = sanitizeClientKey(msg.clientKey);
+      if (key) ws.ownerKey = key;
       addChat("System", `${current.name} updated their name.`);
       broadcastUsers();
       broadcastChat();
@@ -309,9 +320,9 @@ wss.on("connection", (ws) => {
         const prevColor = state.pixels[y][x];
         const prevOwner = state.owners[y][x];
         if (prevColor === color) continue;
-        changes.push({ x, y, from: prevColor, to: color, fromOwner: prevOwner, toOwner: ws.userId });
+        changes.push({ x, y, from: prevColor, to: color, fromOwner: prevOwner, toOwner: ws.ownerKey });
         state.pixels[y][x] = color;
-        state.owners[y][x] = ws.userId;
+        state.owners[y][x] = ws.ownerKey;
         updates.push({ x, y, color });
       }
       if (changes.length > 0) {
@@ -360,7 +371,7 @@ wss.on("connection", (ws) => {
       const updates = [];
       for (let y = 0; y < GRID_HEIGHT; y += 1) {
         for (let x = 0; x < GRID_WIDTH; x += 1) {
-          if (state.owners[y][x] !== ws.userId) continue;
+          if (state.owners[y][x] !== ws.ownerKey) continue;
           state.pixels[y][x] = DEFAULT_PIXEL;
           state.owners[y][x] = null;
           updates.push({ x, y, color: DEFAULT_PIXEL });
