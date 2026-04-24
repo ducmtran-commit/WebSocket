@@ -53,6 +53,8 @@ body {
   overflow: hidden;
   /* `backdrop-filter` on large fixed layers is expensive; solid bg is enough here. */
   backdrop-filter: none;
+  /* Faster double-tap on touch; double-click still works on desktop. */
+  touch-action: manipulation;
 }
 
 .workspace-panel.workspace-ui-collapsed {
