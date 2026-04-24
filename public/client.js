@@ -68,8 +68,25 @@ const SECTION_REORDER_SLOT_UNSET = Symbol("sectionReorderSlot");
 /** Last drop target for placeholder; avoids repeat `insertBefore` / `appendChild` every mousemove. */
 let sectionReorderInsertBefore = SECTION_REORDER_SLOT_UNSET;
 const COLOR_HISTORY_KEY = "pixel-board-color-history";
+const CLIENT_KEY_STORAGE = "pixel-board-client-key";
 const MAX_COLOR_HISTORY = 10;
 let recentColors = [];
+
+/** Stable id for paint ownership across page refresh (server `ownerKey`). */
+function getOrCreateClientKey() {
+  try {
+    let key = window.localStorage.getItem(CLIENT_KEY_STORAGE);
+    if (typeof key === "string" && /^[a-zA-Z0-9_-]{8,64}$/.test(key)) return key;
+    key =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `k-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+    window.localStorage.setItem(CLIENT_KEY_STORAGE, key);
+    return key;
+  } catch {
+    return `session-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+}
 
 function wsUrl() {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -314,7 +331,6 @@ function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
   const viewportRect = boardViewport.getBoundingClientRect();
   const viewW = boardViewport.clientWidth;
   const viewH = boardViewport.clientHeight;
-  // Scroll math matches the scrollport padding edge, not the border box origin.
   const innerLeft = viewportRect.left + boardViewport.clientLeft;
   const innerTop = viewportRect.top + boardViewport.clientTop;
   const innerRight = innerLeft + viewW;
@@ -333,34 +349,34 @@ function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
     ? clamp(anchorClientY, innerTop, Math.max(innerTop, innerBottom - 1e-6))
     : innerTop + viewH / 2;
 
-  const boardRect = board.getBoundingClientRect();
+  const pivotRelX = pivotX - innerLeft;
+  const pivotRelY = pivotY - innerTop;
+  // Board-local coords from scroll-space (stable; avoids getBoundingClientRect vs scroll mismatch).
+  const lx = (boardViewport.scrollLeft + pivotRelX) / prevZoom;
+  const ly = (boardViewport.scrollTop + pivotRelY) / prevZoom;
   const ratio = clamped / prevZoom;
-  const localX = (pivotX - boardRect.left) / prevZoom;
-  const localY = (pivotY - boardRect.top) / prevZoom;
 
   zoomLevel = clamped;
   zoomInput.value = String(clamped);
   zoomText.textContent = `Zoom: ${Math.round(clamped * 100)}%`;
   board.style.transform = `scale(${zoomLevel})`;
 
-  // Refresh layout so scrollWidth/height match the new scale before clamping scroll.
   void board.offsetWidth;
 
-  const nextScrollLeft = boardViewport.scrollLeft + (pivotX - boardRect.left) * (ratio - 1);
-  const nextScrollTop = boardViewport.scrollTop + (pivotY - boardRect.top) * (ratio - 1);
+  const nextScrollLeft = lx * clamped - pivotRelX;
+  const nextScrollTop = ly * clamped - pivotRelY;
 
   const maxLeft = Math.max(0, boardViewport.scrollWidth - boardViewport.clientWidth);
   const maxTop = Math.max(0, boardViewport.scrollHeight - boardViewport.clientHeight);
   boardViewport.scrollLeft = clamp(nextScrollLeft, 0, maxLeft);
   boardViewport.scrollTop = clamp(nextScrollTop, 0, maxTop);
 
-  // Fix subpixel / clamp slip so repeated wheel zooms stay locked to the cursor.
-  if (ratio !== 1) {
+  if (ratio !== 1 && hasAnchor) {
     void board.offsetWidth;
-    const brAfter = board.getBoundingClientRect();
-    const slipX = pivotX - (brAfter.left + localX * zoomLevel);
-    const slipY = pivotY - (brAfter.top + localY * zoomLevel);
-    if (Math.abs(slipX) > 0.35 || Math.abs(slipY) > 0.35) {
+    const br = board.getBoundingClientRect();
+    const slipX = pivotX - (br.left + lx * clamped);
+    const slipY = pivotY - (br.top + ly * clamped);
+    if (Math.abs(slipX) > 0.5 || Math.abs(slipY) > 0.5) {
       const maxL2 = Math.max(0, boardViewport.scrollWidth - boardViewport.clientWidth);
       const maxT2 = Math.max(0, boardViewport.scrollHeight - boardViewport.clientHeight);
       boardViewport.scrollLeft = clamp(boardViewport.scrollLeft - slipX, 0, maxL2);
@@ -419,7 +435,33 @@ function isWorkspaceDblclickToggleTarget(target) {
   if (target.closest("a")) return false;
   if (target.closest("label")) return false;
   if (target.closest(".chat-box")) return false;
+  if (target.closest(".section-drag-handle")) return false;
   return true;
+}
+
+const WORKSPACE_DBL_TAP_MS = 260;
+const WORKSPACE_DBL_TAP_PX = 22;
+let workspaceFastTap = { t: 0, x: 0, y: 0 };
+
+function tryWorkspaceFastDoubleTap(event) {
+  if (event.button !== 0) return false;
+  if (!(event.target instanceof Node) || !(workspaceScroll instanceof HTMLElement)) return false;
+  if (!workspaceScroll.contains(event.target)) return false;
+  if (!isWorkspaceDblclickToggleTarget(event.target)) return false;
+  const now = performance.now();
+  const dt = now - workspaceFastTap.t;
+  const dx = event.clientX - workspaceFastTap.x;
+  const dy = event.clientY - workspaceFastTap.y;
+  const r = WORKSPACE_DBL_TAP_PX;
+  if (workspaceFastTap.t > 0 && dt < WORKSPACE_DBL_TAP_MS && dx * dx + dy * dy < r * r) {
+    event.preventDefault();
+    event.stopPropagation();
+    workspaceFastTap = { t: 0, x: 0, y: 0 };
+    toggleWorkspaceUiCollapsed();
+    return true;
+  }
+  workspaceFastTap = { t: now, x: event.clientX, y: event.clientY };
+  return false;
 }
 
 function startWorkspaceDrag(event) {
@@ -548,6 +590,14 @@ if (workspaceHandle instanceof HTMLElement) {
 }
 
 if (workspaceScroll instanceof HTMLElement) {
+  workspaceScroll.addEventListener(
+    "pointerdown",
+    (event) => {
+      tryWorkspaceFastDoubleTap(event);
+    },
+    true
+  );
+
   workspaceScroll.addEventListener("mousedown", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
@@ -583,11 +633,6 @@ if (workspaceCollapseBtn instanceof HTMLElement) {
 }
 
 if (workspacePanel instanceof HTMLElement) {
-  workspacePanel.addEventListener("dblclick", (event) => {
-    if (!isWorkspaceDblclickToggleTarget(event.target)) return;
-    event.preventDefault();
-    toggleWorkspaceUiCollapsed();
-  });
   workspacePanel.style.left = "16px";
   workspacePanel.style.top = "16px";
   workspacePanel.style.right = "auto";
@@ -685,6 +730,11 @@ function connect() {
     cancelAnimationFrame(remotePixelFlushRaf);
     remotePixelFlushRaf = null;
   }
+  if (wheelZoomRaf != null) {
+    cancelAnimationFrame(wheelZoomRaf);
+    wheelZoomRaf = null;
+  }
+  wheelZoomAccum = 0;
   pendingRemotePixels.clear();
   releasePaintCapture();
 
@@ -694,7 +744,11 @@ function connect() {
   ws.addEventListener("open", () => {
     reconnectAttempts = 0;
     statusText.textContent = "Status: connected";
-    send({ type: "set-name", name: nameInput.value.trim() || "Student" });
+    send({
+      type: "set-name",
+      name: nameInput.value.trim() || "Student",
+      clientKey: getOrCreateClientKey(),
+    });
   });
 
   ws.addEventListener("message", (event) => {
@@ -899,7 +953,11 @@ boardViewport.addEventListener("contextmenu", (event) => {
 });
 
 setNameBtn.addEventListener("click", () => {
-  send({ type: "set-name", name: nameInput.value.trim() || "Student" });
+  send({
+    type: "set-name",
+    name: nameInput.value.trim() || "Student",
+    clientKey: getOrCreateClientKey(),
+  });
 });
 
 eraserBtn.addEventListener("click", () => {
@@ -958,6 +1016,21 @@ function wheelZoomStep(event) {
   return clamp(-delta * sensitivity, -0.12, 0.12);
 }
 
+/** One zoom apply per frame; keeps cursor-anchored math from fighting rapid wheel bursts. */
+let wheelZoomAccum = 0;
+let wheelZoomRaf = null;
+let wheelZoomClientX = 0;
+let wheelZoomClientY = 0;
+
+function flushWheelZoomFrame() {
+  wheelZoomRaf = null;
+  if (wheelZoomAccum === 0) return;
+  const step = clamp(wheelZoomAccum, -0.2, 0.2);
+  wheelZoomAccum = 0;
+  boardZoomAnchorClient = { x: wheelZoomClientX, y: wheelZoomClientY };
+  setZoom(zoomLevel + step, wheelZoomClientX, wheelZoomClientY);
+}
+
 if (boardViewport instanceof HTMLElement) {
   boardViewport.addEventListener(
     "wheel",
@@ -966,8 +1039,12 @@ if (boardViewport instanceof HTMLElement) {
       event.stopPropagation();
       const step = wheelZoomStep(event);
       if (step === 0) return;
-      boardZoomAnchorClient = { x: event.clientX, y: event.clientY };
-      setZoom(zoomLevel + step, event.clientX, event.clientY);
+      wheelZoomClientX = event.clientX;
+      wheelZoomClientY = event.clientY;
+      wheelZoomAccum += step;
+      if (wheelZoomRaf == null) {
+        wheelZoomRaf = requestAnimationFrame(flushWheelZoomFrame);
+      }
     },
     { passive: false }
   );
