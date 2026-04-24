@@ -314,26 +314,29 @@ function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
   const viewportRect = boardViewport.getBoundingClientRect();
   const viewW = boardViewport.clientWidth;
   const viewH = boardViewport.clientHeight;
+  // Scroll math matches the scrollport padding edge, not the border box origin.
+  const innerLeft = viewportRect.left + boardViewport.clientLeft;
+  const innerTop = viewportRect.top + boardViewport.clientTop;
+  const innerRight = innerLeft + viewW;
+  const innerBottom = innerTop + viewH;
+
   const hasAnchor =
     typeof anchorClientX === "number" &&
     Number.isFinite(anchorClientX) &&
     typeof anchorClientY === "number" &&
     Number.isFinite(anchorClientY);
 
-  const anchorX = hasAnchor
-    ? clamp(anchorClientX - viewportRect.left, 0, Math.max(0, viewW - 1e-6))
-    : viewW / 2;
-  const anchorY = hasAnchor
-    ? clamp(anchorClientY - viewportRect.top, 0, Math.max(0, viewH - 1e-6))
-    : viewH / 2;
+  const pivotX = hasAnchor
+    ? clamp(anchorClientX, innerLeft, Math.max(innerLeft, innerRight - 1e-6))
+    : innerLeft + viewW / 2;
+  const pivotY = hasAnchor
+    ? clamp(anchorClientY, innerTop, Math.max(innerTop, innerBottom - 1e-6))
+    : innerTop + viewH / 2;
 
-  // Screen position of zoom pivot (viewport client coords → document client coords).
-  const ax = viewportRect.left + anchorX;
-  const ay = viewportRect.top + anchorY;
-
-  // Board edge before applying the new scale (transform-origin: top left → this stays fixed).
   const boardRect = board.getBoundingClientRect();
   const ratio = clamped / prevZoom;
+  const localX = (pivotX - boardRect.left) / prevZoom;
+  const localY = (pivotY - boardRect.top) / prevZoom;
 
   zoomLevel = clamped;
   zoomInput.value = String(clamped);
@@ -343,14 +346,27 @@ function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
   // Refresh layout so scrollWidth/height match the new scale before clamping scroll.
   void board.offsetWidth;
 
-  // Keep the board point under (ax, ay) stable: scroll += (offset from board left)*(scale ratio - 1).
-  const nextScrollLeft = boardViewport.scrollLeft + (ax - boardRect.left) * (ratio - 1);
-  const nextScrollTop = boardViewport.scrollTop + (ay - boardRect.top) * (ratio - 1);
+  const nextScrollLeft = boardViewport.scrollLeft + (pivotX - boardRect.left) * (ratio - 1);
+  const nextScrollTop = boardViewport.scrollTop + (pivotY - boardRect.top) * (ratio - 1);
 
   const maxLeft = Math.max(0, boardViewport.scrollWidth - boardViewport.clientWidth);
   const maxTop = Math.max(0, boardViewport.scrollHeight - boardViewport.clientHeight);
   boardViewport.scrollLeft = clamp(nextScrollLeft, 0, maxLeft);
   boardViewport.scrollTop = clamp(nextScrollTop, 0, maxTop);
+
+  // Fix subpixel / clamp slip so repeated wheel zooms stay locked to the cursor.
+  if (ratio !== 1) {
+    void board.offsetWidth;
+    const brAfter = board.getBoundingClientRect();
+    const slipX = pivotX - (brAfter.left + localX * zoomLevel);
+    const slipY = pivotY - (brAfter.top + localY * zoomLevel);
+    if (Math.abs(slipX) > 0.35 || Math.abs(slipY) > 0.35) {
+      const maxL2 = Math.max(0, boardViewport.scrollWidth - boardViewport.clientWidth);
+      const maxT2 = Math.max(0, boardViewport.scrollHeight - boardViewport.clientHeight);
+      boardViewport.scrollLeft = clamp(boardViewport.scrollLeft - slipX, 0, maxL2);
+      boardViewport.scrollTop = clamp(boardViewport.scrollTop - slipY, 0, maxT2);
+    }
+  }
 }
 
 function shouldStartPanning(event) {
@@ -958,11 +974,15 @@ if (boardViewport instanceof HTMLElement) {
 
   boardViewport.addEventListener("pointermove", (event) => {
     const r = boardViewport.getBoundingClientRect();
+    const il = r.left + boardViewport.clientLeft;
+    const it = r.top + boardViewport.clientTop;
+    const iw = boardViewport.clientWidth;
+    const ih = boardViewport.clientHeight;
     if (
-      event.clientX >= r.left &&
-      event.clientX < r.right &&
-      event.clientY >= r.top &&
-      event.clientY < r.bottom
+      event.clientX >= il &&
+      event.clientX < il + iw &&
+      event.clientY >= it &&
+      event.clientY < it + ih
     ) {
       boardZoomAnchorClient = { x: event.clientX, y: event.clientY };
     }
@@ -1024,5 +1044,9 @@ addColorToHistory(colorInput.value);
 connect();
 
 window.addEventListener("resize", () => {
-  setZoom(zoomLevel);
+  if (boardZoomAnchorClient) {
+    setZoom(zoomLevel, boardZoomAnchorClient.x, boardZoomAnchorClient.y);
+  } else {
+    setZoom(zoomLevel);
+  }
 });
