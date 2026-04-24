@@ -439,24 +439,42 @@ function isWorkspaceDblclickToggleTarget(target) {
   return true;
 }
 
-const WORKSPACE_DBL_TAP_MS = 260;
-const WORKSPACE_DBL_TAP_PX = 22;
+/** Fast double-tap / second-press window (ms). */
+const WORKSPACE_DBL_TAP_MS = 180;
+const WORKSPACE_DBL_TAP_PX = 34;
 let workspaceFastTap = { t: 0, x: 0, y: 0 };
+/** After a pointer double-tap toggle, ignore native `dblclick` briefly (same gesture). */
+let workspaceSuppressNativeDblUntil = 0;
+/** Cancels deferred workspace-handle drag (arm timer + listeners). */
+let cancelWorkspaceHandleDragArm = null;
+
+function clearWorkspaceHandleDragArm() {
+  if (cancelWorkspaceHandleDragArm) {
+    cancelWorkspaceHandleDragArm();
+    cancelWorkspaceHandleDragArm = null;
+  }
+}
 
 function tryWorkspaceFastDoubleTap(event) {
-  if (event.button !== 0) return false;
-  if (!(event.target instanceof Node) || !(workspaceScroll instanceof HTMLElement)) return false;
-  if (!workspaceScroll.contains(event.target)) return false;
-  if (!isWorkspaceDblclickToggleTarget(event.target)) return false;
+  if (event.pointerType === "mouse" && event.button !== 0) return false;
+  if (!(workspacePanel instanceof HTMLElement)) return false;
+  if (!(event.target instanceof Node) || !workspacePanel.contains(event.target)) return false;
+  if (!isWorkspaceDblclickToggleTarget(event.target)) {
+    workspaceFastTap = { t: 0, x: 0, y: 0 };
+    return false;
+  }
   const now = performance.now();
   const dt = now - workspaceFastTap.t;
   const dx = event.clientX - workspaceFastTap.x;
   const dy = event.clientY - workspaceFastTap.y;
   const r = WORKSPACE_DBL_TAP_PX;
   if (workspaceFastTap.t > 0 && dt < WORKSPACE_DBL_TAP_MS && dx * dx + dy * dy < r * r) {
-    event.preventDefault();
-    event.stopPropagation();
+    clearWorkspaceHandleDragArm();
+    if (workspaceDragging) {
+      stopWorkspaceDrag();
+    }
     workspaceFastTap = { t: 0, x: 0, y: 0 };
+    workspaceSuppressNativeDblUntil = now + 450;
     toggleWorkspaceUiCollapsed();
     return true;
   }
@@ -580,24 +598,51 @@ function stopSectionReorder() {
   sectionReorder = null;
 }
 
+const WORKSPACE_HANDLE_DRAG_ARM_MS = 130;
+const WORKSPACE_HANDLE_DRAG_MOVE_PX = 6;
+
 if (workspaceHandle instanceof HTMLElement) {
-  workspaceHandle.addEventListener("mousedown", (event) => {
-    if (event.target instanceof HTMLElement && event.target.closest("button")) return;
-    if (event.button !== 0) return;
+  workspaceHandle.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    if (!(event.target instanceof HTMLElement) || event.target.closest("button")) return;
     event.preventDefault();
-    startWorkspaceDrag(event);
+    clearWorkspaceHandleDragArm();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const orig = event;
+    const moveThresh = WORKSPACE_HANDLE_DRAG_MOVE_PX * WORKSPACE_HANDLE_DRAG_MOVE_PX;
+    const armTimer = window.setTimeout(() => {
+      cleanup();
+      cancelWorkspaceHandleDragArm = null;
+      startWorkspaceDrag(orig);
+    }, WORKSPACE_HANDLE_DRAG_ARM_MS);
+    const onMove = (e) => {
+      const mdx = e.clientX - startX;
+      const mdy = e.clientY - startY;
+      if (mdx * mdx + mdy * mdy >= moveThresh) {
+        cleanup();
+        cancelWorkspaceHandleDragArm = null;
+        startWorkspaceDrag(orig);
+      }
+    };
+    const onUp = () => {
+      cleanup();
+      cancelWorkspaceHandleDragArm = null;
+    };
+    function cleanup() {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      window.clearTimeout(armTimer);
+    }
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("pointerup", onUp, { passive: true });
+    window.addEventListener("pointercancel", onUp, { passive: true });
+    cancelWorkspaceHandleDragArm = cleanup;
   });
 }
 
 if (workspaceScroll instanceof HTMLElement) {
-  workspaceScroll.addEventListener(
-    "pointerdown",
-    (event) => {
-      tryWorkspaceFastDoubleTap(event);
-    },
-    true
-  );
-
   workspaceScroll.addEventListener("mousedown", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
@@ -633,6 +678,29 @@ if (workspaceCollapseBtn instanceof HTMLElement) {
 }
 
 if (workspacePanel instanceof HTMLElement) {
+  workspacePanel.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (tryWorkspaceFastDoubleTap(event)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    },
+    true
+  );
+  workspacePanel.addEventListener("dblclick", (event) => {
+    if (performance.now() < workspaceSuppressNativeDblUntil) {
+      event.preventDefault();
+      return;
+    }
+    if (!isWorkspaceDblclickToggleTarget(event.target)) return;
+    event.preventDefault();
+    clearWorkspaceHandleDragArm();
+    if (workspaceDragging) {
+      stopWorkspaceDrag();
+    }
+    toggleWorkspaceUiCollapsed();
+  });
   workspacePanel.style.left = "16px";
   workspacePanel.style.top = "16px";
   workspacePanel.style.right = "auto";
