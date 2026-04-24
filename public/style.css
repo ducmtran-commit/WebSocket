@@ -43,11 +43,11 @@ body {
 }
 
 .workspace-panel {
-  top: 16px;
-  left: 16px;
-  width: min(460px, calc(100vw - 32px));
-  max-height: calc(100vh - 32px);
-  padding: 12px;
+  top: 12px;
+  left: 12px;
+  width: min(380px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  padding: 8px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -66,17 +66,17 @@ body {
 .workspace-drag-handle {
   cursor: move;
   user-select: none;
-  margin: -2px 0 8px;
-  padding: 6px 10px;
+  margin: -2px 0 4px;
+  padding: 4px 8px;
   border: 1px dashed #475569;
-  border-radius: 8px;
+  border-radius: 6px;
   color: #cbd5e1;
   background: #111827;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
 }
 
@@ -86,7 +86,7 @@ body {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-right: 4px;
+  padding-right: 2px;
 }
 
 .workspace-section-stack {
@@ -96,7 +96,7 @@ body {
 }
 
 .workspace-section-row {
-  margin-bottom: 12px;
+  margin-bottom: 6px;
 }
 
 .workspace-section-row:last-child {
@@ -114,26 +114,26 @@ body {
 }
 
 .workspace-section-placeholder {
-  margin-bottom: 12px;
+  margin-bottom: 6px;
   pointer-events: none;
 }
 
 .workspace-section-placeholder-dash {
   width: 100%;
-  min-height: 48px;
+  min-height: 36px;
   border: 2px dashed #475569;
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(30, 41, 59, 0.35);
 }
 
 .section-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  margin-bottom: 8px;
+  gap: 6px;
+  padding: 4px 6px;
+  margin-bottom: 4px;
   border: 1px solid #334155;
-  border-radius: 8px;
+  border-radius: 6px;
   background: #0f172a;
   user-select: none;
 }
@@ -178,7 +178,7 @@ body {
 .section-title {
   flex: 1;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   color: #e2e8f0;
 }
 
@@ -210,8 +210,15 @@ body {
 
 
 .workspace-section h1 {
+  margin: 0 0 2px;
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.workspace-section-body > .subtitle {
   margin: 0 0 6px;
-  font-size: 1.25rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .drag-title {
@@ -225,8 +232,8 @@ body {
 }
 
 .panel-actions button {
-  padding: 4px 8px;
-  font-size: 0.8rem;
+  padding: 3px 6px;
+  font-size: 0.75rem;
 }
 
 .floating-panel.is-dragging {
@@ -244,32 +251,53 @@ body {
 }
 
 #toolText {
-  margin: 8px 0 0;
+  margin: 4px 0 0;
   color: #cbd5e1;
+  font-size: 0.78rem;
 }
 
 #zoomText {
-  margin: 8px 0 0;
+  margin: 4px 0 0;
   color: #cbd5e1;
+  font-size: 0.78rem;
 }
 
-.panel {
+#statusText,
+#playersText {
+  margin: 3px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
+.workspace-panel .panel {
   border: 1px solid #334155;
-  border-radius: 12px;
+  border-radius: 8px;
   background: #111827;
-  padding: 12px;
+  padding: 8px 10px;
+}
+
+.workspace-panel .panel > label {
+  display: block;
+  margin-top: 6px;
+  margin-bottom: 2px;
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.workspace-panel .panel > label:first-of-type {
+  margin-top: 0;
 }
 
 .row {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .color-history {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   flex-wrap: wrap;
-  margin: 6px 0 10px;
+  margin: 4px 0 6px;
 }
 
 .color-swatch {
@@ -293,6 +321,12 @@ button {
   padding: 8px 10px;
 }
 
+.workspace-panel input,
+.workspace-panel button {
+  padding: 6px 8px;
+  font-size: 0.82rem;
+}
+
 button {
   cursor: pointer;
 }
@@ -302,14 +336,14 @@ input {
 }
 
 .chat-box {
-  height: 180px;
+  height: 120px;
   overflow-y: auto;
   border: 1px solid #334155;
-  border-radius: 8px;
-  padding: 8px;
-  margin-bottom: 8px;
+  border-radius: 6px;
+  padding: 6px;
+  margin-bottom: 6px;
   background: #0b1220;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
 }
 
 .chat-line {
@@ -373,10 +407,11 @@ input {
 
 @media (max-width: 920px) {
   .workspace-panel {
-    width: min(380px, calc(100vw - 24px));
-    top: 12px;
-    left: 12px;
-    max-height: calc(100vh - 24px);
+    width: min(340px, calc(100vw - 20px));
+    top: 10px;
+    left: 10px;
+    max-height: calc(100vh - 20px);
+    padding: 6px;
   }
 
   .board-viewport {
