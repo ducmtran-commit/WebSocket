@@ -63,6 +63,7 @@ let shouldAutoHideToolbox = true;
 let workspaceDragging = false;
 let workspaceDragLastX = 0;
 let workspaceDragLastY = 0;
+let workspaceHidden = false;
 let sectionReorder = null;
 const SECTION_REORDER_SLOT_UNSET = Symbol("sectionReorderSlot");
 /** Last drop target for placeholder; avoids repeat `insertBefore` / `appendChild` every mousemove. */
@@ -419,6 +420,23 @@ function syncWorkspaceCollapseButton() {
   workspaceCollapseBtn.setAttribute("aria-label", collapsed ? "Expand workspace" : "Collapse workspace");
 }
 
+function setWorkspaceHidden(shouldHide) {
+  if (!(workspacePanel instanceof HTMLElement)) return;
+  workspaceHidden = Boolean(shouldHide);
+  workspacePanel.classList.toggle("workspace-hidden", workspaceHidden);
+  workspacePanel.setAttribute("aria-hidden", String(workspaceHidden));
+  if (workspaceHidden) {
+    stopSectionReorder();
+    if (workspaceDragging) {
+      stopWorkspaceDrag();
+    }
+  }
+}
+
+function toggleWorkspaceHidden() {
+  setWorkspaceHidden(!workspaceHidden);
+}
+
 function toggleWorkspaceUiCollapsed() {
   if (!(workspacePanel instanceof HTMLElement)) return;
   stopSectionReorder();
@@ -639,6 +657,7 @@ if (workspaceCollapseBtn instanceof HTMLElement) {
 }
 
 if (workspacePanel instanceof HTMLElement) {
+  workspacePanel.setAttribute("aria-keyshortcuts", "Tab");
   workspacePanel.addEventListener(
     "pointerdown",
     (event) => {
@@ -1110,11 +1129,17 @@ chatInput.addEventListener("keydown", (event) => {
 });
 
 window.addEventListener("keydown", (event) => {
-  if (event.code === "Space" && shouldHandleCanvasShortcut(event)) {
+  const canUseCanvasShortcut = shouldHandleCanvasShortcut(event);
+  if (event.code === "Tab" && canUseCanvasShortcut) {
+    event.preventDefault();
+    toggleWorkspaceHidden();
+    return;
+  }
+  if (event.code === "Space" && canUseCanvasShortcut) {
     isSpaceHeld = true;
     event.preventDefault();
   }
-  if (!shouldHandleCanvasShortcut(event)) return;
+  if (!canUseCanvasShortcut) return;
   const isCmdOrCtrl = event.ctrlKey || event.metaKey;
   if (!isCmdOrCtrl) return;
 
