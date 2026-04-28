@@ -91,75 +91,128 @@ body.app-gated.entering-canvas .layout {
 .launch-center {
   position: relative;
   z-index: 1;
-  width: min(620px, calc(100vw - 40px));
-  padding: 22px;
+  width: min(420px, calc(100vw - 40px));
+  padding: 18px 18px 16px;
   text-align: center;
-  border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.38);
-  background: rgba(15, 23, 42, 0.74);
-  box-shadow: 0 22px 48px rgba(2, 6, 23, 0.62);
-}
-
-.launch-center h1 {
-  margin: 0;
-  font-size: clamp(2rem, 5.8vw, 3.3rem);
-  line-height: 1.05;
-  letter-spacing: 0.02em;
-  text-wrap: balance;
-}
-
-.launch-copy {
-  margin: 12px 0 0;
-  color: #cbd5e1;
-  font-size: clamp(0.96rem, 2vw, 1.15rem);
+  border-radius: 10px;
+  border: 1px solid rgba(100, 116, 139, 0.42);
+  background: rgba(7, 14, 28, 0.86);
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.64);
+  animation: launchCenterFloat 2.2s ease-in-out infinite;
 }
 
 .launch-loading-label {
-  margin: 18px 0 8px;
-  font-size: 1rem;
+  margin: 2px 0 10px;
+  font-size: clamp(1.05rem, 3.6vw, 1.32rem);
   font-weight: 800;
   letter-spacing: 0.14em;
-  color: #cbd5e1;
+  color: #f472b6;
+  text-shadow:
+    1px 0 #fda4af,
+    -1px 0 #a855f7;
+  animation: loadingLabelBlink 1.2s steps(4, end) infinite;
 }
 
 .launch-loading-bar {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   justify-content: center;
-  flex-wrap: wrap;
-  width: min(560px, 100%);
+  flex-wrap: nowrap;
+  width: min(340px, 100%);
   margin: 0 auto;
-  padding: 12px;
+  padding: 10px;
   border: 3px solid #1e293b;
-  border-radius: 4px;
-  background: rgba(2, 6, 23, 0.86);
+  border-radius: 3px;
+  background: rgba(2, 6, 23, 0.92);
+  animation: loadingTrackShift 1.8s ease-in-out infinite;
 }
 
 .loading-pixel {
-  width: 26px;
-  height: 26px;
+  width: 17px;
+  height: 17px;
   border: 2px solid #334155;
-  border-radius: 2px;
+  border-radius: 1px;
   padding: 0;
-  background: #0b1220;
+  background: #0f172a;
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.7);
-  transition: transform 120ms ease, border-color 120ms ease, filter 120ms ease;
+  transform: skewX(-24deg);
+  transition: transform 120ms ease, border-color 120ms ease, filter 120ms ease, background 120ms ease;
 }
 
 .loading-pixel:hover,
 .loading-pixel:focus-visible {
-  transform: translateY(-1px) scale(1.06);
+  transform: translateY(-1px) scale(1.08) skewX(-24deg);
   border-color: #64748b;
-  filter: brightness(1.08);
+  background: #17243c;
+  filter: brightness(1.15);
 }
 
 .loading-pixel.filled {
-  border-color: #facc15;
+  border-color: #f472b6;
   background:
-    linear-gradient(135deg, #fef08a 0 44%, #facc15 44% 70%, #eab308 70% 100%);
+    linear-gradient(135deg, #fda4af 0 34%, #f472b6 34% 68%, #a855f7 68% 100%);
   box-shadow:
-    0 0 0 1px rgba(250, 204, 21, 0.4),
-    0 0 12px rgba(250, 204, 21, 0.35);
+    0 0 0 1px rgba(244, 114, 182, 0.42),
+    0 0 10px rgba(168, 85, 247, 0.38);
+}
+
+.launch-hourglass-wrap {
+  margin-top: 12px;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+
+.launch-hourglass {
+  position: relative;
+  width: 30px;
+  height: 34px;
+  animation: hourglassFlip 1.6s steps(2, end) infinite;
+}
+
+.launch-hourglass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #e2e8f0;
+  clip-path: polygon(
+    8% 0%,
+    92% 0%,
+    62% 44%,
+    62% 56%,
+    92% 100%,
+    8% 100%,
+    38% 56%,
+    38% 44%
+  );
+}
+
+.launch-hourglass::after {
+  content: "";
+  position: absolute;
+  inset: 4px 7px;
+  background:
+    linear-gradient(to bottom, #f59e0b 0 38%, transparent 38% 58%, #fbbf24 58% 100%);
+  clip-path: polygon(
+    0% 0%,
+    100% 0%,
+    62% 44%,
+    62% 56%,
+    100% 100%,
+    0% 100%,
+    38% 56%,
+    38% 44%
+  );
+  animation: hourglassSand 1.6s linear infinite;
+}
+
+.launch-wait-label {
+  margin: 0;
+  font-size: 0.96rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #e2e8f0;
+  animation: waitBlink 1.05s steps(2, end) infinite;
 }
 
 @keyframes launchGateDissolve {
@@ -208,6 +261,76 @@ body.app-gated.entering-canvas .layout {
   }
   70% {
     opacity: 0.2;
+  }
+}
+
+@keyframes launchCenterFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+@keyframes loadingTrackShift {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(7px);
+  }
+}
+
+@keyframes loadingLabelBlink {
+  0%,
+  100% {
+    opacity: 0.98;
+  }
+  50% {
+    opacity: 0.72;
+  }
+}
+
+@keyframes hourglassFlip {
+  0% {
+    transform: rotate(0deg);
+  }
+  49% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(180deg);
+  }
+  100% {
+    transform: rotate(180deg);
+  }
+}
+
+@keyframes hourglassSand {
+  0% {
+    opacity: 0.9;
+    filter: brightness(1);
+  }
+  50% {
+    opacity: 0.7;
+    filter: brightness(1.12);
+  }
+  100% {
+    opacity: 0.9;
+    filter: brightness(1);
+  }
+}
+
+@keyframes waitBlink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
   }
 }
 
