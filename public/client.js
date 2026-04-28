@@ -24,7 +24,7 @@ const workspaceSectionStack = document.getElementById("workspaceSectionStack");
 const workspaceCollapseBtn = document.getElementById("workspaceCollapseBtn");
 const autoHideBtn = document.getElementById("autoHideBtn");
 const launchGate = document.getElementById("launchGate");
-const enterBoardBtn = document.getElementById("enterBoardBtn");
+const launchPixelBtn = document.getElementById("launchPixelBtn");
 
 let ws;
 let reconnectAttempts = 0;
@@ -98,20 +98,81 @@ function wsUrl() {
   return `${protocol}//${window.location.host}`;
 }
 
-function enterBoardExperience() {
+let launchSfxCtx = null;
+
+function playLaunchPixelSound() {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return;
+  if (!launchSfxCtx) launchSfxCtx = new Ctx();
+  const ctx = launchSfxCtx;
+  if (ctx.state === "suspended") {
+    ctx.resume().catch(() => {});
+  }
+  const now = ctx.currentTime + 0.005;
+  const master = ctx.createGain();
+  master.gain.setValueAtTime(0.0001, now);
+  master.gain.exponentialRampToValueAtTime(0.14, now + 0.02);
+  master.gain.exponentialRampToValueAtTime(0.0001, now + 0.24);
+  master.connect(ctx.destination);
+
+  const voice = (freq, start, duration) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "square";
+    osc.frequency.setValueAtTime(freq, now + start);
+    gain.gain.setValueAtTime(0.0001, now + start);
+    gain.gain.exponentialRampToValueAtTime(0.25, now + start + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + start + duration);
+    osc.connect(gain);
+    gain.connect(master);
+    osc.start(now + start);
+    osc.stop(now + start + duration + 0.01);
+  };
+  voice(392, 0, 0.08);
+  voice(523.25, 0.07, 0.11);
+}
+
+function setEnterOriginFromClick(sourceEvent) {
+  if (!(document.body instanceof HTMLElement)) return;
+  if (sourceEvent && Number.isFinite(sourceEvent.clientX) && Number.isFinite(sourceEvent.clientY)) {
+    document.body.style.setProperty("--enter-origin-x", `${sourceEvent.clientX}px`);
+    document.body.style.setProperty("--enter-origin-y", `${sourceEvent.clientY}px`);
+    return;
+  }
+  const rect =
+    launchPixelBtn instanceof HTMLElement ? launchPixelBtn.getBoundingClientRect() : launchGate?.getBoundingClientRect();
+  if (!rect) return;
+  const x = rect.left + rect.width / 2;
+  const y = rect.top + rect.height / 2;
+  document.body.style.setProperty("--enter-origin-x", `${x}px`);
+  document.body.style.setProperty("--enter-origin-y", `${y}px`);
+}
+
+function enterBoardExperience(sourceEvent = null) {
   if (hasEnteredBoard) return;
   hasEnteredBoard = true;
+  setEnterOriginFromClick(sourceEvent);
+  playLaunchPixelSound();
   if (document.body instanceof HTMLElement) {
-    document.body.classList.remove("app-gated");
+    document.body.classList.add("entering-canvas");
   }
   if (launchGate instanceof HTMLElement) {
-    launchGate.classList.add("is-exiting");
+    launchGate.classList.add("is-entering");
     window.setTimeout(() => {
       launchGate.classList.add("hidden");
-    }, 320);
+    }, 760);
   }
-  if (enterBoardBtn instanceof HTMLElement) {
-    enterBoardBtn.blur();
+  if (launchPixelBtn instanceof HTMLElement) {
+    launchPixelBtn.blur();
+  }
+  window.setTimeout(() => {
+    if (document.body instanceof HTMLElement) {
+      document.body.classList.remove("app-gated");
+      document.body.classList.remove("entering-canvas");
+    }
+  }, 220);
+  if (statusText instanceof HTMLElement) {
+    statusText.textContent = "Status: connecting...";
   }
   connect();
 }
@@ -1182,6 +1243,7 @@ chatInput.addEventListener("keydown", (event) => {
 
 window.addEventListener("keydown", (event) => {
   const canUseCanvasShortcut = shouldHandleCanvasShortcut(event);
+  if (!hasEnteredBoard) return;
   if (event.code === "Tab" && canUseCanvasShortcut) {
     event.preventDefault();
     toggleWorkspaceHidden();
@@ -1223,11 +1285,11 @@ syncWorkspaceCollapseButton();
 loadColorHistory();
 addColorToHistory(colorInput.value);
 if (statusText instanceof HTMLElement) {
-  statusText.textContent = "Status: press Enter Board to connect";
+  statusText.textContent = "Status: click the pixel to connect";
 }
-if (enterBoardBtn instanceof HTMLElement) {
-  enterBoardBtn.addEventListener("click", () => {
-    enterBoardExperience();
+if (launchPixelBtn instanceof HTMLElement) {
+  launchPixelBtn.addEventListener("click", (event) => {
+    enterBoardExperience(event);
   });
 } else {
   enterBoardExperience();
