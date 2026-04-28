@@ -66,7 +66,65 @@ body {
 }
 
 .workspace-panel.workspace-hidden {
-  display: none;
+  opacity: 0;
+  transform: translateY(-4px) scale(0.985);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@keyframes workspacePixelFlickerOut {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: brightness(1);
+  }
+  22% {
+    opacity: 0.16;
+    filter: brightness(1.25);
+  }
+  46% {
+    opacity: 0.9;
+  }
+  68% {
+    opacity: 0.24;
+    filter: brightness(1.35);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+    filter: brightness(1.4);
+  }
+}
+
+@keyframes workspacePixelFlickerIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+    filter: brightness(1.45);
+  }
+  24% {
+    opacity: 0.65;
+  }
+  42% {
+    opacity: 0.22;
+    filter: brightness(1.3);
+  }
+  70% {
+    opacity: 0.88;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: brightness(1);
+  }
+}
+
+.workspace-panel.workspace-flicker-hide {
+  animation: workspacePixelFlickerOut 190ms steps(6, end) forwards;
+}
+
+.workspace-panel.workspace-flicker-show {
+  animation: workspacePixelFlickerIn 190ms steps(6, end) both;
 }
 
 .workspace-drag-handle {
