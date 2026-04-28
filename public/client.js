@@ -70,6 +70,7 @@ let workspaceHideTimer = null;
 let hasEnteredBoard = false;
 const LAUNCH_LOADING_PIXEL_MIN = 7;
 const LAUNCH_LOADING_PIXEL_MAX = 14;
+const LAUNCH_ENTER_ANIM_MS = 920;
 let launchLoadingPixelCount = LAUNCH_LOADING_PIXEL_MAX;
 let launchFilledPixels = 0;
 let sectionReorder = null;
@@ -175,20 +176,8 @@ function fillNextLaunchPixel(sourceEvent = null) {
 
 function setEnterOriginFromClick(sourceEvent) {
   if (!(document.body instanceof HTMLElement)) return;
-  if (sourceEvent && Number.isFinite(sourceEvent.clientX) && Number.isFinite(sourceEvent.clientY)) {
-    document.body.style.setProperty("--enter-origin-x", `${sourceEvent.clientX}px`);
-    document.body.style.setProperty("--enter-origin-y", `${sourceEvent.clientY}px`);
-    return;
-  }
-  const rect =
-    launchLoadingBar instanceof HTMLElement
-      ? launchLoadingBar.getBoundingClientRect()
-      : launchGate?.getBoundingClientRect();
-  if (!rect) return;
-  const x = rect.left + rect.width / 2;
-  const y = rect.top + rect.height / 2;
-  document.body.style.setProperty("--enter-origin-x", `${x}px`);
-  document.body.style.setProperty("--enter-origin-y", `${y}px`);
+  document.body.style.setProperty("--enter-origin-x", "50vw");
+  document.body.style.setProperty("--enter-origin-y", "50vh");
 }
 
 function enterBoardExperience(sourceEvent = null) {
@@ -203,7 +192,7 @@ function enterBoardExperience(sourceEvent = null) {
     launchGate.classList.add("is-entering");
     window.setTimeout(() => {
       launchGate.classList.add("hidden");
-    }, 760);
+    }, LAUNCH_ENTER_ANIM_MS);
   }
   if (document.activeElement instanceof HTMLElement) {
     document.activeElement.blur();
@@ -213,7 +202,7 @@ function enterBoardExperience(sourceEvent = null) {
       document.body.classList.remove("app-gated");
       document.body.classList.remove("entering-canvas");
     }
-  }, 760);
+  }, LAUNCH_ENTER_ANIM_MS);
   if (statusText instanceof HTMLElement) {
     statusText.textContent = "Status: connecting...";
   }
