@@ -428,6 +428,7 @@ function toggleWorkspaceUiCollapsed() {
 
 function isWorkspaceDblclickToggleTarget(target) {
   if (!(target instanceof HTMLElement)) return false;
+  if (target.closest("#workspaceHandle")) return false;
   if (target.closest("button")) return false;
   if (target.closest("input")) return false;
   if (target.closest("textarea")) return false;
@@ -445,15 +446,6 @@ const WORKSPACE_DBL_TAP_PX = 34;
 let workspaceFastTap = { t: 0, x: 0, y: 0 };
 /** After a pointer double-tap toggle, ignore native `dblclick` briefly (same gesture). */
 let workspaceSuppressNativeDblUntil = 0;
-/** Cancels deferred workspace-handle drag (arm timer + listeners). */
-let cancelWorkspaceHandleDragArm = null;
-
-function clearWorkspaceHandleDragArm() {
-  if (cancelWorkspaceHandleDragArm) {
-    cancelWorkspaceHandleDragArm();
-    cancelWorkspaceHandleDragArm = null;
-  }
-}
 
 function tryWorkspaceFastDoubleTap(event) {
   if (event.pointerType === "mouse" && event.button !== 0) return false;
@@ -469,7 +461,6 @@ function tryWorkspaceFastDoubleTap(event) {
   const dy = event.clientY - workspaceFastTap.y;
   const r = WORKSPACE_DBL_TAP_PX;
   if (workspaceFastTap.t > 0 && dt < WORKSPACE_DBL_TAP_MS && dx * dx + dy * dy < r * r) {
-    clearWorkspaceHandleDragArm();
     if (workspaceDragging) {
       stopWorkspaceDrag();
     }
@@ -598,47 +589,17 @@ function stopSectionReorder() {
   sectionReorder = null;
 }
 
-const WORKSPACE_HANDLE_DRAG_ARM_MS = 130;
-const WORKSPACE_HANDLE_DRAG_MOVE_PX = 6;
-
 if (workspaceHandle instanceof HTMLElement) {
   workspaceHandle.addEventListener("pointerdown", (event) => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
     if (!(event.target instanceof HTMLElement) || event.target.closest("button")) return;
     event.preventDefault();
-    clearWorkspaceHandleDragArm();
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const orig = event;
-    const moveThresh = WORKSPACE_HANDLE_DRAG_MOVE_PX * WORKSPACE_HANDLE_DRAG_MOVE_PX;
-    const armTimer = window.setTimeout(() => {
-      cleanup();
-      cancelWorkspaceHandleDragArm = null;
-      startWorkspaceDrag(orig);
-    }, WORKSPACE_HANDLE_DRAG_ARM_MS);
-    const onMove = (e) => {
-      const mdx = e.clientX - startX;
-      const mdy = e.clientY - startY;
-      if (mdx * mdx + mdy * mdy >= moveThresh) {
-        cleanup();
-        cancelWorkspaceHandleDragArm = null;
-        startWorkspaceDrag(orig);
-      }
-    };
-    const onUp = () => {
-      cleanup();
-      cancelWorkspaceHandleDragArm = null;
-    };
-    function cleanup() {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-      window.clearTimeout(armTimer);
+    event.stopPropagation();
+    if (workspaceDragging) {
+      stopWorkspaceDrag();
+      return;
     }
-    window.addEventListener("pointermove", onMove, { passive: true });
-    window.addEventListener("pointerup", onUp, { passive: true });
-    window.addEventListener("pointercancel", onUp, { passive: true });
-    cancelWorkspaceHandleDragArm = cleanup;
+    startWorkspaceDrag(event);
   });
 }
 
@@ -695,7 +656,6 @@ if (workspacePanel instanceof HTMLElement) {
     }
     if (!isWorkspaceDblclickToggleTarget(event.target)) return;
     event.preventDefault();
-    clearWorkspaceHandleDragArm();
     if (workspaceDragging) {
       stopWorkspaceDrag();
     }
@@ -960,7 +920,6 @@ board.addEventListener("mousedown", (event) => {
 
 window.addEventListener("mouseup", () => {
   stopSectionReorder();
-  stopWorkspaceDrag();
   if (isPanning) {
     isPanning = false;
     boardViewport.classList.remove("is-panning");
