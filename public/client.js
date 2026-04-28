@@ -1199,7 +1199,7 @@ eraserBtn.addEventListener("click", () => {
   toolText.textContent = `Tool: ${isErasing ? "Eraser" : "Brush"}`;
 });
 
-clearBtn.addEventListener("click", () => {
+function clearMyDrawingWithConfirm() {
   if (
     !window.confirm(
       "Clear only the pixels you painted on the shared board? Other artists’ pixels stay."
@@ -1208,6 +1208,10 @@ clearBtn.addEventListener("click", () => {
     return;
   }
   send({ type: "clear-board" });
+}
+
+clearBtn.addEventListener("click", () => {
+  clearMyDrawingWithConfirm();
 });
 
 zoomInput.addEventListener("input", () => {
@@ -1329,10 +1333,22 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault();
   }
   if (!canUseCanvasShortcut) return;
+  const key = event.key.toLowerCase();
+  if (!event.ctrlKey && !event.metaKey && !event.altKey && key === "e") {
+    event.preventDefault();
+    isErasing = !isErasing;
+    eraserBtn.textContent = `Eraser: ${isErasing ? "On" : "Off"}`;
+    toolText.textContent = `Tool: ${isErasing ? "Eraser" : "Brush"}`;
+    return;
+  }
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === "x") {
+    event.preventDefault();
+    clearMyDrawingWithConfirm();
+    return;
+  }
   const isCmdOrCtrl = event.ctrlKey || event.metaKey;
   if (!isCmdOrCtrl) return;
 
-  const key = event.key.toLowerCase();
   if (key === "z" && !event.shiftKey) {
     event.preventDefault();
     flushPaintBatch();
