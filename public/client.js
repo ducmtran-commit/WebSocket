@@ -64,6 +64,7 @@ let workspaceDragging = false;
 let workspaceDragLastX = 0;
 let workspaceDragLastY = 0;
 let workspaceHidden = false;
+let workspaceHideTimer = null;
 let sectionReorder = null;
 const SECTION_REORDER_SLOT_UNSET = Symbol("sectionReorderSlot");
 /** Last drop target for placeholder; avoids repeat `insertBefore` / `appendChild` every mousemove. */
@@ -420,17 +421,46 @@ function syncWorkspaceCollapseButton() {
   workspaceCollapseBtn.setAttribute("aria-label", collapsed ? "Expand workspace" : "Collapse workspace");
 }
 
+const WORKSPACE_FLICKER_MS = 190;
+
+function clearWorkspaceHideTimer() {
+  if (workspaceHideTimer != null) {
+    window.clearTimeout(workspaceHideTimer);
+    workspaceHideTimer = null;
+  }
+}
+
 function setWorkspaceHidden(shouldHide) {
   if (!(workspacePanel instanceof HTMLElement)) return;
-  workspaceHidden = Boolean(shouldHide);
-  workspacePanel.classList.toggle("workspace-hidden", workspaceHidden);
-  workspacePanel.setAttribute("aria-hidden", String(workspaceHidden));
-  if (workspaceHidden) {
+  const hide = Boolean(shouldHide);
+  workspaceHidden = hide;
+  clearWorkspaceHideTimer();
+  workspacePanel.classList.remove("workspace-flicker-show", "workspace-flicker-hide");
+  if (hide) {
     stopSectionReorder();
     if (workspaceDragging) {
       stopWorkspaceDrag();
     }
+    workspacePanel.classList.remove("workspace-hidden");
+    workspacePanel.setAttribute("aria-hidden", "false");
+    void workspacePanel.offsetWidth;
+    workspacePanel.classList.add("workspace-flicker-hide");
+    workspaceHideTimer = window.setTimeout(() => {
+      workspacePanel.classList.remove("workspace-flicker-hide");
+      workspacePanel.classList.add("workspace-hidden");
+      workspacePanel.setAttribute("aria-hidden", "true");
+      workspaceHideTimer = null;
+    }, WORKSPACE_FLICKER_MS);
+    return;
   }
+  workspacePanel.classList.remove("workspace-hidden");
+  workspacePanel.setAttribute("aria-hidden", "false");
+  void workspacePanel.offsetWidth;
+  workspacePanel.classList.add("workspace-flicker-show");
+  workspaceHideTimer = window.setTimeout(() => {
+    workspacePanel.classList.remove("workspace-flicker-show");
+    workspaceHideTimer = null;
+  }, WORKSPACE_FLICKER_MS);
 }
 
 function toggleWorkspaceHidden() {
