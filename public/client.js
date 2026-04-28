@@ -24,7 +24,7 @@ const workspaceSectionStack = document.getElementById("workspaceSectionStack");
 const workspaceCollapseBtn = document.getElementById("workspaceCollapseBtn");
 const autoHideBtn = document.getElementById("autoHideBtn");
 const launchGate = document.getElementById("launchGate");
-const launchPixelBtn = document.getElementById("launchPixelBtn");
+const launchLoadingBar = document.getElementById("launchLoadingBar");
 
 let ws;
 let reconnectAttempts = 0;
@@ -68,6 +68,8 @@ let workspaceDragLastY = 0;
 let workspaceHidden = false;
 let workspaceHideTimer = null;
 let hasEnteredBoard = false;
+const LAUNCH_LOADING_PIXEL_COUNT = 14;
+let launchFilledPixels = 0;
 let sectionReorder = null;
 const SECTION_REORDER_SLOT_UNSET = Symbol("sectionReorderSlot");
 /** Last drop target for placeholder; avoids repeat `insertBefore` / `appendChild` every mousemove. */
@@ -100,7 +102,7 @@ function wsUrl() {
 
 let launchSfxCtx = null;
 
-function playLaunchPixelSound() {
+function playLaunchPixelSound(progress = 0) {
   const Ctx = window.AudioContext || window.webkitAudioContext;
   if (!Ctx) return;
   if (!launchSfxCtx) launchSfxCtx = new Ctx();
@@ -111,8 +113,8 @@ function playLaunchPixelSound() {
   const now = ctx.currentTime + 0.005;
   const master = ctx.createGain();
   master.gain.setValueAtTime(0.0001, now);
-  master.gain.exponentialRampToValueAtTime(0.14, now + 0.02);
-  master.gain.exponentialRampToValueAtTime(0.0001, now + 0.24);
+  master.gain.exponentialRampToValueAtTime(0.11, now + 0.015);
+  master.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
   master.connect(ctx.destination);
 
   const voice = (freq, start, duration) => {
@@ -128,8 +130,35 @@ function playLaunchPixelSound() {
     osc.start(now + start);
     osc.stop(now + start + duration + 0.01);
   };
-  voice(392, 0, 0.08);
-  voice(523.25, 0.07, 0.11);
+  const base = 300 + Math.floor(clamp(progress, 0, 1) * 260);
+  voice(base, 0, 0.05);
+  voice(base * 1.33, 0.045, 0.08);
+}
+
+function buildLaunchLoadingBar() {
+  if (!(launchLoadingBar instanceof HTMLElement)) return;
+  launchLoadingBar.innerHTML = "";
+  launchFilledPixels = 0;
+  for (let i = 0; i < LAUNCH_LOADING_PIXEL_COUNT; i += 1) {
+    const cell = document.createElement("button");
+    cell.type = "button";
+    cell.className = "loading-pixel";
+    cell.setAttribute("aria-label", `Fill loading pixel ${i + 1}`);
+    cell.dataset.filled = "0";
+    cell.addEventListener("click", (event) => {
+      if (hasEnteredBoard || cell.dataset.filled === "1") return;
+      cell.dataset.filled = "1";
+      cell.classList.add("filled");
+      launchFilledPixels += 1;
+      playLaunchPixelSound(launchFilledPixels / LAUNCH_LOADING_PIXEL_COUNT);
+      if (launchFilledPixels >= LAUNCH_LOADING_PIXEL_COUNT) {
+        window.setTimeout(() => {
+          enterBoardExperience(event);
+        }, 140);
+      }
+    });
+    launchLoadingBar.appendChild(cell);
+  }
 }
 
 function setEnterOriginFromClick(sourceEvent) {
@@ -140,7 +169,9 @@ function setEnterOriginFromClick(sourceEvent) {
     return;
   }
   const rect =
-    launchPixelBtn instanceof HTMLElement ? launchPixelBtn.getBoundingClientRect() : launchGate?.getBoundingClientRect();
+    launchLoadingBar instanceof HTMLElement
+      ? launchLoadingBar.getBoundingClientRect()
+      : launchGate?.getBoundingClientRect();
   if (!rect) return;
   const x = rect.left + rect.width / 2;
   const y = rect.top + rect.height / 2;
@@ -162,15 +193,15 @@ function enterBoardExperience(sourceEvent = null) {
       launchGate.classList.add("hidden");
     }, 760);
   }
-  if (launchPixelBtn instanceof HTMLElement) {
-    launchPixelBtn.blur();
+  if (document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur();
   }
   window.setTimeout(() => {
     if (document.body instanceof HTMLElement) {
       document.body.classList.remove("app-gated");
       document.body.classList.remove("entering-canvas");
     }
-  }, 220);
+  }, 760);
   if (statusText instanceof HTMLElement) {
     statusText.textContent = "Status: connecting...";
   }
@@ -1285,12 +1316,10 @@ syncWorkspaceCollapseButton();
 loadColorHistory();
 addColorToHistory(colorInput.value);
 if (statusText instanceof HTMLElement) {
-  statusText.textContent = "Status: click the pixel to connect";
+  statusText.textContent = "Status: fill all loading pixels to connect";
 }
-if (launchPixelBtn instanceof HTMLElement) {
-  launchPixelBtn.addEventListener("click", (event) => {
-    enterBoardExperience(event);
-  });
+if (launchLoadingBar instanceof HTMLElement) {
+  buildLaunchLoadingBar();
 } else {
   enterBoardExperience();
 }
