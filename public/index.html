@@ -8,12 +8,16 @@
   </head>
   <body class="app-gated">
     <div id="launchGate" class="launch-gate" role="dialog" aria-modal="true" aria-labelledby="launchTitle">
-      <div class="launch-card">
-        <p class="launch-eyebrow">PIXEL JAM</p>
-        <h1 id="launchTitle">PixTogether</h1>
-        <p class="launch-copy">Jump into the shared board and draw with everyone in real time.</p>
-        <button id="enterBoardBtn" type="button" class="launch-enter-btn" autofocus>Enter Board</button>
-        <p class="launch-tip">Tip: Press <kbd>Tab</kbd> in board mode to hide/show workspace.</p>
+      <div class="launch-center">
+        <h1 id="launchTitle">This canvas is never finished.</h1>
+        <p class="launch-copy">Place your first pixel.</p>
+        <button
+          id="launchPixelBtn"
+          type="button"
+          class="launch-pixel-btn"
+          aria-label="Place your first pixel and enter the board"
+          autofocus
+        ></button>
       </div>
     </div>
     <main class="layout">
