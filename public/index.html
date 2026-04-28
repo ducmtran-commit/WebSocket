@@ -9,10 +9,12 @@
   <body class="app-gated">
     <div id="launchGate" class="launch-gate" role="dialog" aria-modal="true" aria-labelledby="launchTitle">
       <div class="launch-center">
-        <h1 id="launchTitle">This canvas is never finished.</h1>
-        <p class="launch-copy">Place your first pixel.</p>
-        <p class="launch-loading-label">LOADING...</p>
+        <p id="launchTitle" class="launch-loading-label">LOADING...</p>
         <div id="launchLoadingBar" class="launch-loading-bar" role="group" aria-label="Fill loading pixels"></div>
+        <div class="launch-hourglass-wrap" aria-hidden="true">
+          <div class="launch-hourglass"></div>
+          <p class="launch-wait-label">PLEASE WAIT...</p>
+        </div>
       </div>
     </div>
     <main class="layout">
