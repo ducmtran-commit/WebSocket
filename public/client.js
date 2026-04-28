@@ -68,7 +68,9 @@ let workspaceDragLastY = 0;
 let workspaceHidden = false;
 let workspaceHideTimer = null;
 let hasEnteredBoard = false;
-const LAUNCH_LOADING_PIXEL_COUNT = 14;
+const LAUNCH_LOADING_PIXEL_MIN = 7;
+const LAUNCH_LOADING_PIXEL_MAX = 14;
+let launchLoadingPixelCount = LAUNCH_LOADING_PIXEL_MAX;
 let launchFilledPixels = 0;
 let sectionReorder = null;
 const SECTION_REORDER_SLOT_UNSET = Symbol("sectionReorderSlot");
@@ -138,39 +140,36 @@ function playLaunchPixelSound(progress = 0) {
 function buildLaunchLoadingBar() {
   if (!(launchLoadingBar instanceof HTMLElement)) return;
   launchLoadingBar.innerHTML = "";
+  launchLoadingPixelCount =
+    Math.floor(Math.random() * (LAUNCH_LOADING_PIXEL_MAX - LAUNCH_LOADING_PIXEL_MIN + 1)) +
+    LAUNCH_LOADING_PIXEL_MIN;
   launchFilledPixels = 0;
-  const fillOneRandomPixel = (sourceEvent) => {
-    if (hasEnteredBoard) return;
-    const unfilled = Array.from(launchLoadingBar.querySelectorAll(".loading-pixel")).filter(
-      (el) => el instanceof HTMLElement && el.dataset.filled !== "1"
-    );
-    if (unfilled.length === 0) return;
-    const randomCell = unfilled[Math.floor(Math.random() * unfilled.length)];
-    if (!(randomCell instanceof HTMLElement)) return;
-    randomCell.dataset.filled = "1";
-    randomCell.classList.add("filled");
-    launchFilledPixels += 1;
-    playLaunchPixelSound(launchFilledPixels / LAUNCH_LOADING_PIXEL_COUNT);
-    if (launchFilledPixels >= LAUNCH_LOADING_PIXEL_COUNT) {
-      window.setTimeout(() => {
-        enterBoardExperience(sourceEvent || null);
-      }, 170);
-    }
-  };
-  for (let i = 0; i < LAUNCH_LOADING_PIXEL_COUNT; i += 1) {
+  for (let i = 0; i < launchLoadingPixelCount; i += 1) {
     const cell = document.createElement("button");
     cell.type = "button";
     cell.className = "loading-pixel";
     cell.setAttribute("aria-label", `Fill loading pixel ${i + 1}`);
     cell.dataset.filled = "0";
-    cell.addEventListener("click", (event) => {
-      fillOneRandomPixel(event);
-    });
     launchLoadingBar.appendChild(cell);
   }
   const firstCell = launchLoadingBar.querySelector(".loading-pixel");
   if (firstCell instanceof HTMLElement) {
     firstCell.focus({ preventScroll: true });
+  }
+}
+
+function fillNextLaunchPixel(sourceEvent = null) {
+  if (hasEnteredBoard || !(launchLoadingBar instanceof HTMLElement)) return;
+  const nextUnfilled = launchLoadingBar.querySelector('.loading-pixel[data-filled="0"]');
+  if (!(nextUnfilled instanceof HTMLElement)) return;
+  nextUnfilled.dataset.filled = "1";
+  nextUnfilled.classList.add("filled");
+  launchFilledPixels += 1;
+  playLaunchPixelSound(launchFilledPixels / Math.max(1, launchLoadingPixelCount));
+  if (launchFilledPixels >= launchLoadingPixelCount) {
+    window.setTimeout(() => {
+      enterBoardExperience(sourceEvent);
+    }, 170);
   }
 }
 
@@ -1329,10 +1328,20 @@ syncWorkspaceCollapseButton();
 loadColorHistory();
 addColorToHistory(colorInput.value);
 if (statusText instanceof HTMLElement) {
-  statusText.textContent = "Status: fill loading pixels to connect";
+  statusText.textContent = "Status: click anywhere to load";
 }
 if (launchLoadingBar instanceof HTMLElement) {
   buildLaunchLoadingBar();
+  window.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (hasEnteredBoard) return;
+      if (!(document.body instanceof HTMLElement) || !document.body.classList.contains("app-gated")) return;
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      fillNextLaunchPixel(event);
+    },
+    true
+  );
 } else {
   enterBoardExperience();
 }
