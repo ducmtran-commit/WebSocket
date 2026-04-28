@@ -23,6 +23,8 @@ const workspaceScroll = document.getElementById("workspaceScroll");
 const workspaceSectionStack = document.getElementById("workspaceSectionStack");
 const workspaceCollapseBtn = document.getElementById("workspaceCollapseBtn");
 const autoHideBtn = document.getElementById("autoHideBtn");
+const launchGate = document.getElementById("launchGate");
+const enterBoardBtn = document.getElementById("enterBoardBtn");
 
 let ws;
 let reconnectAttempts = 0;
@@ -65,6 +67,7 @@ let workspaceDragLastX = 0;
 let workspaceDragLastY = 0;
 let workspaceHidden = false;
 let workspaceHideTimer = null;
+let hasEnteredBoard = false;
 let sectionReorder = null;
 const SECTION_REORDER_SLOT_UNSET = Symbol("sectionReorderSlot");
 /** Last drop target for placeholder; avoids repeat `insertBefore` / `appendChild` every mousemove. */
@@ -93,6 +96,24 @@ function getOrCreateClientKey() {
 function wsUrl() {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   return `${protocol}//${window.location.host}`;
+}
+
+function enterBoardExperience() {
+  if (hasEnteredBoard) return;
+  hasEnteredBoard = true;
+  if (document.body instanceof HTMLElement) {
+    document.body.classList.remove("app-gated");
+  }
+  if (launchGate instanceof HTMLElement) {
+    launchGate.classList.add("is-exiting");
+    window.setTimeout(() => {
+      launchGate.classList.add("hidden");
+    }, 320);
+  }
+  if (enterBoardBtn instanceof HTMLElement) {
+    enterBoardBtn.blur();
+  }
+  connect();
 }
 
 function send(payload) {
@@ -795,6 +816,7 @@ function renderState(state) {
 }
 
 function connect() {
+  if (!hasEnteredBoard) return;
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
@@ -1200,7 +1222,16 @@ syncToolboxButtons();
 syncWorkspaceCollapseButton();
 loadColorHistory();
 addColorToHistory(colorInput.value);
-connect();
+if (statusText instanceof HTMLElement) {
+  statusText.textContent = "Status: press Enter Board to connect";
+}
+if (enterBoardBtn instanceof HTMLElement) {
+  enterBoardBtn.addEventListener("click", () => {
+    enterBoardExperience();
+  });
+} else {
+  enterBoardExperience();
+}
 
 window.addEventListener("resize", () => {
   if (boardZoomAnchorClient) {
