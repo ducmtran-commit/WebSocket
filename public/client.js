@@ -145,12 +145,18 @@ function buildLaunchLoadingBar() {
     Math.floor(Math.random() * (LAUNCH_LOADING_PIXEL_MAX - LAUNCH_LOADING_PIXEL_MIN + 1)) +
     LAUNCH_LOADING_PIXEL_MIN;
   launchFilledPixels = 0;
+  const initialFilled = Math.floor(Math.random() * launchLoadingPixelCount);
   for (let i = 0; i < launchLoadingPixelCount; i += 1) {
     const cell = document.createElement("button");
     cell.type = "button";
     cell.className = "loading-pixel";
     cell.setAttribute("aria-label", `Fill loading pixel ${i + 1}`);
-    cell.dataset.filled = "0";
+    const shouldStartFilled = i < initialFilled;
+    cell.dataset.filled = shouldStartFilled ? "1" : "0";
+    if (shouldStartFilled) {
+      cell.classList.add("filled");
+      launchFilledPixels += 1;
+    }
     launchLoadingBar.appendChild(cell);
   }
   const firstCell = launchLoadingBar.querySelector(".loading-pixel");
