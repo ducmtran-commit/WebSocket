@@ -11,6 +11,10 @@ body {
   overflow: hidden;
 }
 
+body.app-gated .layout {
+  filter: blur(1px) saturate(0.88);
+}
+
 .layout {
   width: 100%;
   margin: 0;
@@ -18,6 +22,112 @@ body {
   min-height: 100vh;
   height: 100vh;
   position: relative;
+}
+
+.launch-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(14, 24, 39, 0.92) 0 2px,
+      rgba(17, 24, 39, 0.92) 2px 4px
+    ),
+    radial-gradient(circle at 50% 20%, rgba(34, 197, 94, 0.22), rgba(15, 23, 42, 0.9));
+}
+
+.launch-gate.is-exiting {
+  animation: launchGateFlickerOut 320ms steps(8, end) forwards;
+}
+
+.launch-gate.hidden {
+  display: none;
+}
+
+.launch-card {
+  width: min(540px, calc(100vw - 40px));
+  border: 3px solid #22c55e;
+  box-shadow: 0 0 0 3px #0f172a, 0 18px 40px rgba(0, 0, 0, 0.6);
+  border-radius: 10px;
+  background: #0b1220;
+  padding: 24px 24px 18px;
+  text-align: center;
+}
+
+.launch-eyebrow {
+  margin: 0 0 6px;
+  color: #93c5fd;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  font-size: 0.76rem;
+}
+
+.launch-card h1 {
+  margin: 0 0 10px;
+  font-size: clamp(1.8rem, 6vw, 2.7rem);
+  letter-spacing: 0.02em;
+}
+
+.launch-copy {
+  margin: 0;
+  color: #cbd5e1;
+}
+
+.launch-enter-btn {
+  margin-top: 16px;
+  min-width: 160px;
+  border: 2px solid #22c55e;
+  background: #14532d;
+  color: #dcfce7;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.launch-enter-btn:hover,
+.launch-enter-btn:focus-visible {
+  background: #166534;
+  border-color: #4ade80;
+}
+
+.launch-tip {
+  margin: 14px 0 0;
+  color: #94a3b8;
+  font-size: 0.8rem;
+}
+
+kbd {
+  border: 1px solid #475569;
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  padding: 1px 6px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 0.78rem;
+}
+
+@keyframes launchGateFlickerOut {
+  0% {
+    opacity: 1;
+    filter: brightness(1);
+  }
+  22% {
+    opacity: 0.2;
+    filter: brightness(1.35);
+  }
+  46% {
+    opacity: 0.86;
+  }
+  71% {
+    opacity: 0.18;
+  }
+  100% {
+    opacity: 0;
+    filter: brightness(1.5);
+  }
 }
 
 .left,
