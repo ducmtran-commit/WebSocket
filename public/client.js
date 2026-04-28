@@ -192,6 +192,7 @@ function enterBoardExperience(sourceEvent = null) {
   setEnterOriginFromClick(sourceEvent);
   playLaunchPixelSound();
   if (document.body instanceof HTMLElement) {
+    document.body.classList.remove("app-gated");
     document.body.classList.add("entering-canvas");
   }
   if (launchGate instanceof HTMLElement) {
@@ -205,7 +206,6 @@ function enterBoardExperience(sourceEvent = null) {
   }
   window.setTimeout(() => {
     if (document.body instanceof HTMLElement) {
-      document.body.classList.remove("app-gated");
       document.body.classList.remove("entering-canvas");
     }
   }, LAUNCH_ENTER_ANIM_MS);
