@@ -65,6 +65,10 @@ body {
   display: none;
 }
 
+.workspace-panel.workspace-hidden {
+  display: none;
+}
+
 .workspace-drag-handle {
   cursor: move;
   user-select: none;
