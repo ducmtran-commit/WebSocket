@@ -11,10 +11,6 @@ body {
   overflow: hidden;
 }
 
-body.app-gated .layout {
-  filter: blur(1px) saturate(0.88);
-}
-
 .layout {
   width: 100%;
   margin: 0;
@@ -22,6 +18,17 @@ body.app-gated .layout {
   min-height: 100vh;
   height: 100vh;
   position: relative;
+  transition: filter 0.5s ease, transform 0.6s ease;
+}
+
+body.app-gated .layout {
+  filter: blur(2px) saturate(0.82) brightness(0.75);
+  transform: scale(1.06);
+}
+
+body.app-gated.entering-canvas .layout {
+  animation: boardZoomIn 760ms cubic-bezier(0.2, 0.76, 0.2, 1) forwards;
+  transform-origin: var(--enter-origin-x, 50vw) var(--enter-origin-y, 50vh);
 }
 
 .launch-gate {
@@ -30,103 +37,154 @@ body.app-gated .layout {
   z-index: 120;
   display: grid;
   place-items: center;
-  padding: 20px;
-  background:
-    repeating-linear-gradient(
-      0deg,
-      rgba(14, 24, 39, 0.92) 0 2px,
-      rgba(17, 24, 39, 0.92) 2px 4px
-    ),
-    radial-gradient(circle at 50% 20%, rgba(34, 197, 94, 0.22), rgba(15, 23, 42, 0.9));
+  padding: 24px;
+  overflow: hidden;
+  background: #020617;
 }
 
-.launch-gate.is-exiting {
-  animation: launchGateFlickerOut 320ms steps(8, end) forwards;
+.launch-gate::before {
+  content: "";
+  position: absolute;
+  inset: -24px;
+  background:
+    radial-gradient(circle at 20% 24%, rgba(14, 165, 233, 0.16), transparent 42%),
+    radial-gradient(circle at 78% 68%, rgba(34, 197, 94, 0.18), transparent 48%),
+    linear-gradient(rgba(5, 10, 18, 0.62), rgba(5, 10, 18, 0.62)),
+    repeating-linear-gradient(
+      0deg,
+      rgba(100, 116, 139, 0.16) 0 1px,
+      transparent 1px 18px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(100, 116, 139, 0.16) 0 1px,
+      transparent 1px 18px
+    ),
+    #0b1220;
+  animation: launchGridDrift 22s linear infinite;
+}
+
+.launch-gate::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(148, 163, 184, 0.12), transparent 62%),
+    radial-gradient(circle, rgba(148, 163, 184, 0.2) 0 1px, transparent 1px 100%);
+  background-size: 100% 100%, 24px 24px;
+  opacity: 0.35;
+  mix-blend-mode: screen;
+  animation: launchSparkle 3.8s steps(10, end) infinite;
+}
+
+.launch-gate.is-entering {
+  animation: launchGateZoomOut 760ms cubic-bezier(0.16, 0.78, 0.2, 1) forwards;
+  transform-origin: var(--enter-origin-x, 50vw) var(--enter-origin-y, 50vh);
 }
 
 .launch-gate.hidden {
   display: none;
 }
 
-.launch-card {
-  width: min(540px, calc(100vw - 40px));
-  border: 3px solid #22c55e;
-  box-shadow: 0 0 0 3px #0f172a, 0 18px 40px rgba(0, 0, 0, 0.6);
-  border-radius: 10px;
-  background: #0b1220;
-  padding: 24px 24px 18px;
+.launch-center {
+  position: relative;
+  z-index: 1;
+  width: min(620px, calc(100vw - 40px));
+  padding: 22px;
   text-align: center;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.38);
+  background: rgba(15, 23, 42, 0.74);
+  box-shadow: 0 22px 48px rgba(2, 6, 23, 0.62);
 }
 
-.launch-eyebrow {
-  margin: 0 0 6px;
-  color: #93c5fd;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  font-size: 0.76rem;
-}
-
-.launch-card h1 {
-  margin: 0 0 10px;
-  font-size: clamp(1.8rem, 6vw, 2.7rem);
+.launch-center h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5.8vw, 3.3rem);
+  line-height: 1.05;
   letter-spacing: 0.02em;
+  text-wrap: balance;
 }
 
 .launch-copy {
-  margin: 0;
+  margin: 12px 0 0;
   color: #cbd5e1;
+  font-size: clamp(0.96rem, 2vw, 1.15rem);
 }
 
-.launch-enter-btn {
-  margin-top: 16px;
-  min-width: 160px;
-  border: 2px solid #22c55e;
-  background: #14532d;
-  color: #dcfce7;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+.launch-pixel-btn {
+  width: 42px;
+  height: 42px;
+  margin-top: 18px;
+  border-radius: 2px;
+  border: 2px solid #bbf7d0;
+  background:
+    linear-gradient(135deg, #86efac 0 46%, #4ade80 46% 72%, #22c55e 72% 100%);
+  box-shadow:
+    0 0 0 3px rgba(34, 197, 94, 0.26),
+    0 12px 20px rgba(0, 0, 0, 0.42);
+  image-rendering: pixelated;
+  transition: transform 140ms ease, box-shadow 140ms ease, filter 140ms ease;
 }
 
-.launch-enter-btn:hover,
-.launch-enter-btn:focus-visible {
-  background: #166534;
-  border-color: #4ade80;
+.launch-pixel-btn:hover,
+.launch-pixel-btn:focus-visible {
+  transform: translateY(-2px) scale(1.1);
+  box-shadow:
+    0 0 0 3px rgba(74, 222, 128, 0.46),
+    0 16px 24px rgba(0, 0, 0, 0.54);
+  filter: brightness(1.1);
 }
 
-.launch-tip {
-  margin: 14px 0 0;
-  color: #94a3b8;
-  font-size: 0.8rem;
-}
-
-kbd {
-  border: 1px solid #475569;
-  border-bottom-width: 2px;
-  border-radius: 6px;
-  padding: 1px 6px;
-  background: #0f172a;
-  color: #e2e8f0;
-  font-size: 0.78rem;
-}
-
-@keyframes launchGateFlickerOut {
+@keyframes launchGateZoomOut {
   0% {
     opacity: 1;
     filter: brightness(1);
+    transform: scale(1);
   }
-  22% {
-    opacity: 0.2;
-    filter: brightness(1.35);
-  }
-  46% {
-    opacity: 0.86;
-  }
-  71% {
-    opacity: 0.18;
+  28% {
+    opacity: 0.96;
   }
   100% {
     opacity: 0;
-    filter: brightness(1.5);
+    filter: brightness(1.3);
+    transform: scale(16);
+  }
+}
+
+@keyframes boardZoomIn {
+  0% {
+    filter: blur(2px) saturate(0.82) brightness(0.75);
+    transform: scale(1.12);
+  }
+  100% {
+    filter: blur(0) saturate(1) brightness(1);
+    transform: scale(1);
+  }
+}
+
+@keyframes launchGridDrift {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(-12px, -16px, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes launchSparkle {
+  0%,
+  100% {
+    opacity: 0.28;
+  }
+  45% {
+    opacity: 0.42;
+  }
+  70% {
+    opacity: 0.2;
   }
 }
 
