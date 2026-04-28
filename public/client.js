@@ -542,6 +542,8 @@ function syncWorkspaceCollapseButton() {
 }
 
 const WORKSPACE_FLICKER_MS = 190;
+const WORKSPACE_TOGGLE_COOLDOWN_MS = 220;
+let workspaceLastToggleAt = 0;
 
 function clearWorkspaceHideTimer() {
   if (workspaceHideTimer != null) {
@@ -584,6 +586,9 @@ function setWorkspaceHidden(shouldHide) {
 }
 
 function toggleWorkspaceHidden() {
+  const now = performance.now();
+  if (now - workspaceLastToggleAt < WORKSPACE_TOGGLE_COOLDOWN_MS) return;
+  workspaceLastToggleAt = now;
   setWorkspaceHidden(!workspaceHidden);
 }
 
@@ -1283,6 +1288,7 @@ window.addEventListener("keydown", (event) => {
   const canUseCanvasShortcut = shouldHandleCanvasShortcut(event);
   if (!hasEnteredBoard) return;
   if (event.code === "Tab" && canUseCanvasShortcut) {
+    if (event.repeat) return;
     event.preventDefault();
     toggleWorkspaceHidden();
     return;
