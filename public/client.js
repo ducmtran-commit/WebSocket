@@ -216,8 +216,12 @@ function enterBoardExperience(sourceEvent = null) {
 }
 
 function send(payload) {
-  if (ws && ws.readyState === WebSocket.OPEN) {
+  if (!(ws && ws.readyState === WebSocket.OPEN)) return false;
+  try {
     ws.send(JSON.stringify(payload));
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -558,6 +562,12 @@ function setWorkspaceHidden(shouldHide) {
   workspaceHidden = hide;
   clearWorkspaceHideTimer();
   workspacePanel.classList.remove("workspace-flicker-show", "workspace-flicker-hide");
+  if (isPainting) {
+    // Avoid extra animation/reflow cost while actively painting.
+    workspacePanel.classList.toggle("workspace-hidden", hide);
+    workspacePanel.setAttribute("aria-hidden", String(hide));
+    return;
+  }
   if (hide) {
     stopSectionReorder();
     if (workspaceDragging) {
@@ -952,6 +962,9 @@ function connect() {
       name: nameInput.value.trim() || "Student",
       clientKey: getOrCreateClientKey(),
     });
+    if (pendingPixels.size > 0) {
+      scheduleFlush();
+    }
   });
 
   ws.addEventListener("message", (event) => {
@@ -963,6 +976,12 @@ function connect() {
     }
     if (msg.type === "init-state") {
       renderState(msg);
+      if (pendingPixels.size > 0) {
+        for (const pixel of pendingPixels.values()) {
+          applyPixel(Number(pixel.x), Number(pixel.y), pixel.color);
+        }
+        scheduleFlush();
+      }
       return;
     }
 
@@ -1040,10 +1059,22 @@ const MAX_PAINT_BATCH = 360;
 function flushPaintBatch() {
   flushTimer = null;
   if (pendingPixels.size === 0) return;
+  if (!(ws && ws.readyState === WebSocket.OPEN)) {
+    scheduleFlush();
+    return;
+  }
   const pixels = Array.from(pendingPixels.values());
-  pendingPixels.clear();
+  let allSent = true;
   for (let i = 0; i < pixels.length; i += MAX_PAINT_BATCH) {
-    send({ type: "paint-batch", pixels: pixels.slice(i, i + MAX_PAINT_BATCH) });
+    if (!send({ type: "paint-batch", pixels: pixels.slice(i, i + MAX_PAINT_BATCH) })) {
+      allSent = false;
+      break;
+    }
+  }
+  if (allSent) {
+    pendingPixels.clear();
+  } else {
+    scheduleFlush();
   }
 }
 
