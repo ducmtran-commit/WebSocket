@@ -30,7 +30,7 @@ body.app-gated .layout {
 body.app-gated.entering-canvas .layout {
   visibility: visible;
   opacity: 1;
-  animation: boardRevealIn 920ms cubic-bezier(0.18, 0.76, 0.2, 1) forwards;
+  animation: boardRevealIn 720ms cubic-bezier(0.18, 0.76, 0.2, 1) forwards;
 }
 
 .launch-gate {
@@ -41,7 +41,7 @@ body.app-gated.entering-canvas .layout {
   place-items: center;
   padding: 24px;
   overflow: hidden;
-  background: #020617;
+  background: #030509;
 }
 
 .launch-gate::before {
@@ -49,9 +49,9 @@ body.app-gated.entering-canvas .layout {
   position: absolute;
   inset: -24px;
   background:
-    radial-gradient(circle at 20% 24%, rgba(14, 165, 233, 0.16), transparent 42%),
-    radial-gradient(circle at 78% 68%, rgba(34, 197, 94, 0.18), transparent 48%),
-    linear-gradient(rgba(5, 10, 18, 0.62), rgba(5, 10, 18, 0.62)),
+    radial-gradient(circle at 24% 26%, rgba(30, 64, 175, 0.22), transparent 44%),
+    radial-gradient(circle at 78% 72%, rgba(30, 58, 138, 0.2), transparent 50%),
+    linear-gradient(rgba(2, 5, 11, 0.76), rgba(2, 5, 11, 0.76)),
     repeating-linear-gradient(
       0deg,
       rgba(100, 116, 139, 0.16) 0 1px,
@@ -62,7 +62,7 @@ body.app-gated.entering-canvas .layout {
       rgba(100, 116, 139, 0.16) 0 1px,
       transparent 1px 18px
     ),
-    #0b1220;
+    #020617;
   animation: launchGridDrift 22s linear infinite;
 }
 
@@ -80,16 +80,16 @@ body.app-gated.entering-canvas .layout {
 }
 
 .launch-gate.is-entering {
-  animation: launchGateDissolve 920ms steps(18, end) forwards;
+  animation: launchGateDissolve 720ms steps(16, end) forwards;
   transform-origin: var(--enter-origin-x, 50vw) var(--enter-origin-y, 50vh);
 }
 
 .launch-gate.is-entering::before {
-  animation: launchGateBreakPixels 920ms steps(16, end) forwards;
+  animation: launchGateBreakPixels 720ms steps(14, end) forwards;
 }
 
 .launch-gate.is-entering::after {
-  animation: launchGateBreakGlow 920ms steps(14, end) forwards;
+  animation: launchGateBreakGlow 720ms steps(12, end) forwards;
 }
 
 .launch-gate.hidden {
@@ -99,7 +99,7 @@ body.app-gated.entering-canvas .layout {
 .launch-center {
   position: relative;
   z-index: 1;
-  width: min(620px, calc(100vw - 40px));
+  width: min(760px, calc(100vw - 28px));
   padding: 0;
   text-align: center;
   animation: launchCenterFloat 2.2s ease-in-out infinite;
@@ -107,7 +107,7 @@ body.app-gated.entering-canvas .layout {
 
 .launch-loading-label {
   margin: 0 0 14px;
-  font-size: clamp(1.4rem, 4.8vw, 2.05rem);
+  font-size: clamp(1.8rem, 5.5vw, 2.7rem);
   font-weight: 800;
   letter-spacing: 0.14em;
   color: #f472b6;
@@ -122,15 +122,15 @@ body.app-gated.entering-canvas .layout {
   gap: 7px;
   justify-content: center;
   flex-wrap: nowrap;
-  width: min(520px, 100%);
+  width: min(700px, 100%);
   margin: 0 auto;
-  padding: 6px 0;
+  padding: 8px 0;
   animation: loadingTrackShift 1.8s ease-in-out infinite;
 }
 
 .loading-pixel {
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
   border: 2px solid #334155;
   border-radius: 1px;
   padding: 0;
@@ -158,16 +158,16 @@ body.app-gated.entering-canvas .layout {
 }
 
 .launch-hourglass-wrap {
-  margin-top: 18px;
+  margin-top: 24px;
   display: grid;
   justify-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .launch-hourglass {
   position: relative;
-  width: 46px;
-  height: 52px;
+  width: 62px;
+  height: 70px;
   animation: hourglassOverclock 0.88s cubic-bezier(0.42, 0, 0.58, 1) infinite;
 }
 
@@ -191,7 +191,7 @@ body.app-gated.entering-canvas .layout {
 .launch-hourglass::after {
   content: "";
   position: absolute;
-  inset: 6px 10px;
+  inset: 8px 13px;
   background:
     linear-gradient(to bottom, #f59e0b 0 38%, transparent 38% 58%, #fbbf24 58% 100%);
   clip-path: polygon(
@@ -209,7 +209,7 @@ body.app-gated.entering-canvas .layout {
 
 .launch-wait-label {
   margin: 0;
-  font-size: clamp(1.05rem, 2.8vw, 1.4rem);
+  font-size: clamp(1.35rem, 3.4vw, 1.95rem);
   font-weight: 700;
   letter-spacing: 0.08em;
   color: #e2e8f0;
@@ -221,7 +221,6 @@ body.app-gated.entering-canvas .layout {
     opacity: 1;
     transform: scale(1);
     filter: brightness(1) blur(0);
-    clip-path: circle(10% at 50% 50%);
   }
   55% {
     opacity: 0.9;
@@ -232,7 +231,6 @@ body.app-gated.entering-canvas .layout {
     opacity: 0;
     transform: scale(1.2);
     filter: brightness(1.35) blur(2px);
-    clip-path: circle(150% at 50% 50%);
   }
 }
 
@@ -262,7 +260,7 @@ body.app-gated.entering-canvas .layout {
 
 @keyframes boardRevealIn {
   0% {
-    filter: blur(4px) saturate(0.8) brightness(0.72);
+    filter: blur(3px) saturate(0.84) brightness(0.78);
     transform: scale(1.08);
   }
   100% {
