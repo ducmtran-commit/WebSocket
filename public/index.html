@@ -3,10 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Co-op Pixel Board</title>
+    <title>PixTogether</title>
     <link rel="stylesheet" href="style.css" />
   </head>
-  <body>
+  <body class="app-gated">
+    <div id="launchGate" class="launch-gate" role="dialog" aria-modal="true" aria-labelledby="launchTitle">
+      <div class="launch-card">
+        <p class="launch-eyebrow">PIXEL JAM</p>
+        <h1 id="launchTitle">PixTogether</h1>
+        <p class="launch-copy">Jump into the shared board and draw with everyone in real time.</p>
+        <button id="enterBoardBtn" type="button" class="launch-enter-btn" autofocus>Enter Board</button>
+        <p class="launch-tip">Tip: Press <kbd>Tab</kbd> in board mode to hide/show workspace.</p>
+      </div>
+    </div>
     <main class="layout">
       <section id="workspacePanel" class="workspace-panel floating-panel">
         <div id="workspaceHandle" class="workspace-drag-handle">
@@ -30,7 +39,7 @@
                 </button>
               </div>
               <div class="workspace-section-body">
-              <h1>Co-op Pixel Board</h1>
+              <h1>PixTogether</h1>
               <p class="subtitle">Everyone paints the same board in real time.</p>
               <div class="panel">
                 <label for="nameInput">Display Name</label>
