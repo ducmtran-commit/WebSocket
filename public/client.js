@@ -70,7 +70,7 @@ let workspaceHideTimer = null;
 let hasEnteredBoard = false;
 const LAUNCH_LOADING_PIXEL_MIN = 7;
 const LAUNCH_LOADING_PIXEL_MAX = 14;
-const LAUNCH_ENTER_ANIM_MS = 920;
+const LAUNCH_ENTER_ANIM_MS = 720;
 let launchLoadingPixelCount = LAUNCH_LOADING_PIXEL_MAX;
 let launchFilledPixels = 0;
 let sectionReorder = null;
@@ -170,7 +170,7 @@ function fillNextLaunchPixel(sourceEvent = null) {
   if (launchFilledPixels >= launchLoadingPixelCount) {
     window.setTimeout(() => {
       enterBoardExperience(sourceEvent);
-    }, 170);
+    }, 70);
   }
 }
 
