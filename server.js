@@ -12,7 +12,8 @@ const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, "data");
 const BOARD_FILE = path.join(DATA_DIR, "board.json");
 const RETENTION_MS = Math.max(1, Number(process.env.BOARD_RETENTION_HOURS || 48)) * 60 * 60 * 1000;
-const IDLE_WIPE_MS = Math.max(1, Number(process.env.BOARD_IDLE_WIPE_MINUTES || 15)) * 60 * 1000;
+// Keep board for 3 days of zero connected clients by default.
+const IDLE_WIPE_MS = Math.max(1, Number(process.env.BOARD_IDLE_WIPE_MINUTES || 4320)) * 60 * 1000;
 const SAVE_DEBOUNCE_MS = Math.max(3000, Number(process.env.BOARD_SAVE_DEBOUNCE_MS || 12000));
 
 const GRID_WIDTH = 256;
