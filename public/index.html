@@ -30,12 +30,28 @@
               autocomplete="off"
             />
           </div>
+          <div class="launch-room-row">
+            <label class="launch-room-label" for="launchRoomCodeInput">CODE</label>
+            <input
+              id="launchRoomCodeInput"
+              class="launch-room-input"
+              type="text"
+              placeholder="JOIN CODE"
+              maxlength="20"
+              spellcheck="false"
+              autocomplete="off"
+            />
+          </div>
           <p id="launchRoomHint" class="launch-room-hint">5 rooms max, 30 players each.</p>
+          <div class="launch-rooms-panel" aria-live="polite">
+            <p class="launch-rooms-title">ROOM STATUS</p>
+            <div id="launchRoomList" class="launch-room-list"></div>
+          </div>
           <div class="launch-menu" role="group" aria-label="Main menu">
             <button id="launchStartBtn" class="launch-menu-btn" type="button">START</button>
             <button id="launchJoinBtn" class="launch-menu-btn" type="button">JOIN ROOM</button>
           </div>
-          <p class="launch-press-start" aria-live="polite">PRESS START TO CONNECT</p>
+          <p class="launch-press-start" aria-live="polite">PRESS START FOR RANDOM ROOM</p>
           <p class="launch-loading-label">LOADING PIXELS...</p>
           <div id="launchLoadingBar" class="launch-loading-bar" role="group" aria-label="Fill loading pixels"></div>
           <div class="launch-hourglass-wrap" aria-hidden="true">
