@@ -25,6 +25,8 @@ const workspaceCollapseBtn = document.getElementById("workspaceCollapseBtn");
 const autoHideBtn = document.getElementById("autoHideBtn");
 const launchGate = document.getElementById("launchGate");
 const launchLoadingBar = document.getElementById("launchLoadingBar");
+const launchStartBtn = document.getElementById("launchStartBtn");
+const launchJoinBtn = document.getElementById("launchJoinBtn");
 
 let ws;
 let reconnectAttempts = 0;
@@ -177,6 +179,13 @@ function fillNextLaunchPixel(sourceEvent = null) {
     window.setTimeout(() => {
       enterBoardExperience(sourceEvent);
     }, 90);
+  }
+}
+
+function fillAllLaunchPixels(sourceEvent = null) {
+  if (hasEnteredBoard || !(launchLoadingBar instanceof HTMLElement)) return;
+  while (launchFilledPixels < launchLoadingPixelCount) {
+    fillNextLaunchPixel(sourceEvent);
   }
 }
 
@@ -1393,6 +1402,15 @@ if (launchLoadingBar instanceof HTMLElement) {
 } else {
   enterBoardExperience();
 }
+
+const launchMenuButtons = [launchStartBtn, launchJoinBtn];
+launchMenuButtons.forEach((button) => {
+  if (!(button instanceof HTMLButtonElement)) return;
+  button.addEventListener("click", (event) => {
+    if (hasEnteredBoard) return;
+    fillAllLaunchPixels(event);
+  });
+});
 
 window.addEventListener("resize", () => {
   if (boardZoomAnchorClient) {
