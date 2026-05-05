@@ -28,7 +28,9 @@ const launchLoadingBar = document.getElementById("launchLoadingBar");
 const launchStartBtn = document.getElementById("launchStartBtn");
 const launchJoinBtn = document.getElementById("launchJoinBtn");
 const launchRoomInput = document.getElementById("launchRoomInput");
+const launchRoomCodeInput = document.getElementById("launchRoomCodeInput");
 const launchRoomHint = document.getElementById("launchRoomHint");
+const launchRoomList = document.getElementById("launchRoomList");
 
 let ws;
 let reconnectAttempts = 0;
@@ -84,10 +86,13 @@ let sectionReorderInsertBefore = SECTION_REORDER_SLOT_UNSET;
 const COLOR_HISTORY_KEY = "pixel-board-color-history";
 const CLIENT_KEY_STORAGE = "pixel-board-client-key";
 const MAX_COLOR_HISTORY = 10;
-const MAX_ROOM_COUNT = 5;
+let maxRoomCount = 5;
+let maxUsersPerRoom = 30;
 let selectedRoomId = "room-1";
+let selectedRoomCode = "";
 let launchConnectMode = "start";
 let shouldReconnect = true;
+let roomPresencePollTimer = null;
 let recentColors = [];
 
 /** Stable id for paint ownership across page refresh (server `ownerKey`). */
@@ -106,7 +111,7 @@ function getOrCreateClientKey() {
   }
 }
 
-function wsUrl(roomId = selectedRoomId, mode = launchConnectMode) {
+function wsUrl(roomId = selectedRoomId, mode = launchConnectMode, roomCode = selectedRoomCode) {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   const url = new URL(`${protocol}//${window.location.host}`);
   if (typeof roomId === "string" && roomId) {
@@ -114,6 +119,9 @@ function wsUrl(roomId = selectedRoomId, mode = launchConnectMode) {
   }
   if (typeof mode === "string" && mode) {
     url.searchParams.set("mode", mode);
+  }
+  if (typeof roomCode === "string" && roomCode) {
+    url.searchParams.set("code", roomCode);
   }
   return url.toString();
 }
@@ -125,7 +133,7 @@ function normalizeRoomId(value) {
   const roomMatch = cleaned.match(/^room-(\d{1,2})$/);
   const digitMatch = cleaned.match(/^(\d{1,2})$/);
   const n = Number(roomMatch?.[1] || digitMatch?.[1]);
-  if (!Number.isInteger(n) || n < 1 || n > MAX_ROOM_COUNT) return null;
+  if (!Number.isInteger(n) || n < 1 || n > maxRoomCount) return null;
   return `room-${n}`;
 }
 
@@ -146,6 +154,74 @@ function setSelectedRoom(roomId) {
   if (launchRoomInput instanceof HTMLInputElement) {
     launchRoomInput.value = displayRoomLabel(roomId);
   }
+}
+
+function normalizeRoomCode(value) {
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, 20);
+}
+
+function renderRoomPresence(rooms = []) {
+  if (!(launchRoomList instanceof HTMLElement)) return;
+  if (!Array.isArray(rooms) || rooms.length === 0) {
+    launchRoomList.innerHTML = '<div class="launch-room-item"><span class="launch-room-item-label">Loading...</span></div>';
+    return;
+  }
+  launchRoomList.innerHTML = "";
+  rooms.forEach((room) => {
+    const roomId = typeof room?.id === "string" ? room.id : "";
+    const label = typeof room?.label === "string" ? room.label : displayRoomLabel(roomId);
+    const users = Number.isInteger(room?.users) ? room.users : 0;
+    const cap = Number.isInteger(room?.capacity) ? room.capacity : maxUsersPerRoom;
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "launch-room-item";
+    if (roomId === selectedRoomId) item.classList.add("is-selected");
+    if (cap > 0 && users >= Math.max(1, Math.floor(cap * 0.8))) item.classList.add("is-near-cap");
+    item.innerHTML = `<span class="launch-room-item-label">${label}</span><span class="launch-room-item-count">${users}/${cap}</span>`;
+    item.addEventListener("click", () => {
+      if (!roomId) return;
+      setSelectedRoom(roomId);
+      updateLaunchRoomHint(`Ready for ${displayRoomLabel(roomId)}.`, false);
+    });
+    launchRoomList.appendChild(item);
+  });
+}
+
+async function refreshRoomPresence() {
+  try {
+    const res = await fetch("/api/rooms", { cache: "no-store" });
+    if (!res.ok) return;
+    const payload = await res.json();
+    if (!payload || !Array.isArray(payload.rooms)) return;
+    if (Number.isInteger(payload.maxRooms) && payload.maxRooms > 0) {
+      maxRoomCount = payload.maxRooms;
+    }
+    if (Number.isInteger(payload.maxUsersPerRoom) && payload.maxUsersPerRoom > 0) {
+      maxUsersPerRoom = payload.maxUsersPerRoom;
+    }
+    renderRoomPresence(payload.rooms);
+  } catch {
+    // Ignore transient fetch failures.
+  }
+}
+
+function startRoomPresencePolling() {
+  if (roomPresencePollTimer != null) return;
+  void refreshRoomPresence();
+  roomPresencePollTimer = window.setInterval(() => {
+    if (hasEnteredBoard) {
+      stopRoomPresencePolling();
+      return;
+    }
+    void refreshRoomPresence();
+  }, 3500);
+}
+
+function stopRoomPresencePolling() {
+  if (roomPresencePollTimer == null) return;
+  window.clearInterval(roomPresencePollTimer);
+  roomPresencePollTimer = null;
 }
 
 let launchSfxCtx = null;
@@ -241,6 +317,7 @@ function setEnterOriginFromClick(sourceEvent) {
 function enterBoardExperience(sourceEvent = null) {
   if (hasEnteredBoard) return;
   hasEnteredBoard = true;
+  stopRoomPresencePolling();
   setEnterOriginFromClick(sourceEvent);
   playLaunchPixelSound();
   if (document.body instanceof HTMLElement) {
@@ -1005,11 +1082,12 @@ function connect() {
   releasePaintCapture();
 
   statusText.textContent = "Status: connecting...";
-  ws = new WebSocket(wsUrl(selectedRoomId, launchConnectMode));
+  ws = new WebSocket(wsUrl(selectedRoomId, launchConnectMode, selectedRoomCode));
 
   ws.addEventListener("open", () => {
     reconnectAttempts = 0;
-    statusText.textContent = `Status: connected (${displayRoomLabel(selectedRoomId)})`;
+    const roomLabel = selectedRoomId ? displayRoomLabel(selectedRoomId) : "RANDOM";
+    statusText.textContent = `Status: connected (${roomLabel})`;
     send({
       type: "set-name",
       name: nameInput.value.trim() || "Student",
@@ -1031,7 +1109,17 @@ function connect() {
       if (typeof msg.roomId === "string") {
         setSelectedRoom(msg.roomId);
       }
-      updateLaunchRoomHint(`Connected to ${displayRoomLabel(selectedRoomId)}.`, false);
+      if (typeof msg.roomJoinCode === "string") {
+        selectedRoomCode = normalizeRoomCode(msg.roomJoinCode);
+        if (launchRoomCodeInput instanceof HTMLInputElement) {
+          launchRoomCodeInput.value = selectedRoomCode;
+        }
+      }
+      launchConnectMode = "join";
+      updateLaunchRoomHint(
+        `Connected to ${displayRoomLabel(selectedRoomId)} | code: ${selectedRoomCode || "N/A"}`,
+        false
+      );
       renderState(msg);
       if (pendingPixels.size > 0) {
         for (const pixel of pendingPixels.values()) {
@@ -1076,7 +1164,7 @@ function connect() {
   });
 
   ws.addEventListener("close", (event) => {
-    if (event.code === 4003 || event.code === 4004) {
+    if (event.code === 4003 || event.code === 4004 || event.code === 4005) {
       const reason = event.reason || "Room unavailable.";
       updateLaunchRoomHint(reason, true);
       statusText.textContent = `Status: ${reason}`;
@@ -1449,10 +1537,11 @@ syncWorkspaceCollapseButton();
 loadColorHistory();
 addColorToHistory(colorInput.value);
 if (statusText instanceof HTMLElement) {
-  statusText.textContent = "Status: select room and press start";
+  statusText.textContent = "Status: press start for random room";
 }
-updateLaunchRoomHint("5 rooms max, 30 players each.", false);
+updateLaunchRoomHint(`Up to ${maxRoomCount} rooms, ${maxUsersPerRoom} users each.`, false);
 setSelectedRoom("room-1");
+startRoomPresencePolling();
 if (launchLoadingBar instanceof HTMLElement) {
   buildLaunchLoadingBar();
   launchLoadingBar.addEventListener("click", (event) => {
@@ -1469,14 +1558,10 @@ if (launchStartBtn instanceof HTMLButtonElement) {
   launchStartBtn.addEventListener("click", (event) => {
     if (hasEnteredBoard) return;
     launchConnectMode = "start";
-    const requested = normalizeRoomId(launchRoomInput instanceof HTMLInputElement ? launchRoomInput.value : "");
-    if (requested) {
-      setSelectedRoom(requested);
-      updateLaunchRoomHint(`Starting in ${displayRoomLabel(requested)}...`, false);
-    } else {
-      selectedRoomId = "";
-      updateLaunchRoomHint("Auto-selecting an available room...", false);
-    }
+    selectedRoomId = "";
+    selectedRoomCode = "";
+    updateLaunchRoomHint("Finding a random available room...", false);
+    void refreshRoomPresence();
     fillAllLaunchPixels(event);
   });
 }
@@ -1487,11 +1572,17 @@ if (launchJoinBtn instanceof HTMLButtonElement) {
     launchConnectMode = "join";
     const requested = normalizeRoomId(launchRoomInput instanceof HTMLInputElement ? launchRoomInput.value : "");
     if (!requested) {
-      updateLaunchRoomHint("Enter ROOM-1 to ROOM-5 to join.", true);
+      updateLaunchRoomHint(`Enter ROOM-1 to ROOM-${maxRoomCount} to join.`, true);
+      return;
+    }
+    const code = normalizeRoomCode(launchRoomCodeInput instanceof HTMLInputElement ? launchRoomCodeInput.value : "");
+    if (!code) {
+      updateLaunchRoomHint("Join code required for private room access.", true);
       return;
     }
     setSelectedRoom(requested);
-    updateLaunchRoomHint(`Joining ${displayRoomLabel(requested)}...`, false);
+    selectedRoomCode = code;
+    updateLaunchRoomHint(`Joining ${displayRoomLabel(requested)} with code...`, false);
     fillAllLaunchPixels(event);
   });
 }
@@ -1503,9 +1594,17 @@ if (launchRoomInput instanceof HTMLInputElement) {
     if (next) {
       selectedRoomId = next;
       updateLaunchRoomHint(`Ready for ${displayRoomLabel(next)}.`, false);
+      void refreshRoomPresence();
     } else {
-      updateLaunchRoomHint("Enter ROOM-1 to ROOM-5.", true);
+      updateLaunchRoomHint(`Enter ROOM-1 to ROOM-${maxRoomCount}.`, true);
     }
+  });
+}
+
+if (launchRoomCodeInput instanceof HTMLInputElement) {
+  launchRoomCodeInput.addEventListener("input", () => {
+    launchRoomCodeInput.value = launchRoomCodeInput.value.toUpperCase();
+    selectedRoomCode = normalizeRoomCode(launchRoomCodeInput.value);
   });
 }
 
