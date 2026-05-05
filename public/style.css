@@ -931,6 +931,53 @@ body {
   text-transform: uppercase;
 }
 
+.launch-room-row {
+  width: min(420px, 100%);
+  margin: 0 auto 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.launch-room-label {
+  min-width: 70px;
+  text-align: left;
+  font-family: "Press Start 2P", "Courier New", monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.11em;
+  color: var(--retro-cyan);
+  text-transform: uppercase;
+}
+
+.launch-room-input {
+  border: 3px solid var(--retro-cyan);
+  border-radius: 0;
+  background: #090f1d;
+  color: var(--retro-text);
+  font-family: "Press Start 2P", "Courier New", monospace;
+  font-size: clamp(0.62rem, 1.9vw, 0.78rem);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 10px 12px;
+}
+
+.launch-room-input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #101726, 0 0 10px rgba(68, 247, 248, 0.45);
+}
+
+.launch-room-hint {
+  margin: 0 0 12px;
+  min-height: 1.2em;
+  color: #c4d0ff;
+  font-size: clamp(0.86rem, 2vw, 1rem);
+  letter-spacing: 0.06em;
+}
+
+.launch-room-hint.error {
+  color: #ff7da8;
+}
+
 .launch-menu {
   display: grid;
   gap: 12px;
