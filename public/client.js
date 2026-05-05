@@ -27,6 +27,8 @@ const launchGate = document.getElementById("launchGate");
 const launchLoadingBar = document.getElementById("launchLoadingBar");
 const launchStartBtn = document.getElementById("launchStartBtn");
 const launchJoinBtn = document.getElementById("launchJoinBtn");
+const launchRoomInput = document.getElementById("launchRoomInput");
+const launchRoomHint = document.getElementById("launchRoomHint");
 
 let ws;
 let reconnectAttempts = 0;
@@ -82,6 +84,10 @@ let sectionReorderInsertBefore = SECTION_REORDER_SLOT_UNSET;
 const COLOR_HISTORY_KEY = "pixel-board-color-history";
 const CLIENT_KEY_STORAGE = "pixel-board-client-key";
 const MAX_COLOR_HISTORY = 10;
+const MAX_ROOM_COUNT = 5;
+let selectedRoomId = "room-1";
+let launchConnectMode = "start";
+let shouldReconnect = true;
 let recentColors = [];
 
 /** Stable id for paint ownership across page refresh (server `ownerKey`). */
@@ -100,9 +106,46 @@ function getOrCreateClientKey() {
   }
 }
 
-function wsUrl() {
+function wsUrl(roomId = selectedRoomId, mode = launchConnectMode) {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${window.location.host}`;
+  const url = new URL(`${protocol}//${window.location.host}`);
+  if (typeof roomId === "string" && roomId) {
+    url.searchParams.set("room", roomId);
+  }
+  if (typeof mode === "string" && mode) {
+    url.searchParams.set("mode", mode);
+  }
+  return url.toString();
+}
+
+function normalizeRoomId(value) {
+  if (typeof value !== "string") return null;
+  const cleaned = value.trim().toLowerCase();
+  if (!cleaned) return null;
+  const roomMatch = cleaned.match(/^room-(\d{1,2})$/);
+  const digitMatch = cleaned.match(/^(\d{1,2})$/);
+  const n = Number(roomMatch?.[1] || digitMatch?.[1]);
+  if (!Number.isInteger(n) || n < 1 || n > MAX_ROOM_COUNT) return null;
+  return `room-${n}`;
+}
+
+function displayRoomLabel(roomId) {
+  const match = String(roomId || "").match(/^room-(\d{1,2})$/i);
+  if (!match) return "ROOM-1";
+  return `ROOM-${match[1]}`;
+}
+
+function updateLaunchRoomHint(message, isError = false) {
+  if (!(launchRoomHint instanceof HTMLElement)) return;
+  launchRoomHint.textContent = message;
+  launchRoomHint.classList.toggle("error", isError);
+}
+
+function setSelectedRoom(roomId) {
+  selectedRoomId = roomId;
+  if (launchRoomInput instanceof HTMLInputElement) {
+    launchRoomInput.value = displayRoomLabel(roomId);
+  }
 }
 
 let launchSfxCtx = null;
@@ -940,6 +983,7 @@ function renderState(state) {
 
 function connect() {
   if (!hasEnteredBoard) return;
+  shouldReconnect = true;
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
@@ -961,11 +1005,11 @@ function connect() {
   releasePaintCapture();
 
   statusText.textContent = "Status: connecting...";
-  ws = new WebSocket(wsUrl());
+  ws = new WebSocket(wsUrl(selectedRoomId, launchConnectMode));
 
   ws.addEventListener("open", () => {
     reconnectAttempts = 0;
-    statusText.textContent = "Status: connected";
+    statusText.textContent = `Status: connected (${displayRoomLabel(selectedRoomId)})`;
     send({
       type: "set-name",
       name: nameInput.value.trim() || "Student",
@@ -984,6 +1028,10 @@ function connect() {
       return;
     }
     if (msg.type === "init-state") {
+      if (typeof msg.roomId === "string") {
+        setSelectedRoom(msg.roomId);
+      }
+      updateLaunchRoomHint(`Connected to ${displayRoomLabel(selectedRoomId)}.`, false);
       renderState(msg);
       if (pendingPixels.size > 0) {
         for (const pixel of pendingPixels.values()) {
@@ -991,6 +1039,14 @@ function connect() {
         }
         scheduleFlush();
       }
+      return;
+    }
+
+    if (msg.type === "room-error") {
+      const reason = typeof msg.message === "string" ? msg.message : "Room unavailable.";
+      updateLaunchRoomHint(reason, true);
+      statusText.textContent = `Status: ${reason}`;
+      shouldReconnect = false;
       return;
     }
 
@@ -1019,7 +1075,15 @@ function connect() {
     }
   });
 
-  ws.addEventListener("close", () => {
+  ws.addEventListener("close", (event) => {
+    if (event.code === 4003 || event.code === 4004) {
+      const reason = event.reason || "Room unavailable.";
+      updateLaunchRoomHint(reason, true);
+      statusText.textContent = `Status: ${reason}`;
+      shouldReconnect = false;
+      return;
+    }
+    if (!shouldReconnect) return;
     statusText.textContent = "Status: disconnected, reconnecting...";
     const wait = Math.min(10000, 500 * 2 ** reconnectAttempts);
     reconnectAttempts += 1;
@@ -1385,32 +1449,65 @@ syncWorkspaceCollapseButton();
 loadColorHistory();
 addColorToHistory(colorInput.value);
 if (statusText instanceof HTMLElement) {
-  statusText.textContent = "Status: click anywhere to load";
+  statusText.textContent = "Status: select room and press start";
 }
+updateLaunchRoomHint("5 rooms max, 30 players each.", false);
+setSelectedRoom("room-1");
 if (launchLoadingBar instanceof HTMLElement) {
   buildLaunchLoadingBar();
-  window.addEventListener(
-    "pointerdown",
-    (event) => {
-      if (hasEnteredBoard) return;
-      if (!(document.body instanceof HTMLElement) || !document.body.classList.contains("app-gated")) return;
-      if (event.pointerType === "mouse" && event.button !== 0) return;
-      fillNextLaunchPixel(event);
-    },
-    true
-  );
+  launchLoadingBar.addEventListener("click", (event) => {
+    if (hasEnteredBoard) return;
+    const target = event.target;
+    if (!(target instanceof HTMLElement) || !target.classList.contains("loading-pixel")) return;
+    fillNextLaunchPixel(event);
+  });
 } else {
   enterBoardExperience();
 }
 
-const launchMenuButtons = [launchStartBtn, launchJoinBtn];
-launchMenuButtons.forEach((button) => {
-  if (!(button instanceof HTMLButtonElement)) return;
-  button.addEventListener("click", (event) => {
+if (launchStartBtn instanceof HTMLButtonElement) {
+  launchStartBtn.addEventListener("click", (event) => {
     if (hasEnteredBoard) return;
+    launchConnectMode = "start";
+    const requested = normalizeRoomId(launchRoomInput instanceof HTMLInputElement ? launchRoomInput.value : "");
+    if (requested) {
+      setSelectedRoom(requested);
+      updateLaunchRoomHint(`Starting in ${displayRoomLabel(requested)}...`, false);
+    } else {
+      selectedRoomId = "";
+      updateLaunchRoomHint("Auto-selecting an available room...", false);
+    }
     fillAllLaunchPixels(event);
   });
-});
+}
+
+if (launchJoinBtn instanceof HTMLButtonElement) {
+  launchJoinBtn.addEventListener("click", (event) => {
+    if (hasEnteredBoard) return;
+    launchConnectMode = "join";
+    const requested = normalizeRoomId(launchRoomInput instanceof HTMLInputElement ? launchRoomInput.value : "");
+    if (!requested) {
+      updateLaunchRoomHint("Enter ROOM-1 to ROOM-5 to join.", true);
+      return;
+    }
+    setSelectedRoom(requested);
+    updateLaunchRoomHint(`Joining ${displayRoomLabel(requested)}...`, false);
+    fillAllLaunchPixels(event);
+  });
+}
+
+if (launchRoomInput instanceof HTMLInputElement) {
+  launchRoomInput.addEventListener("input", () => {
+    launchRoomInput.value = launchRoomInput.value.toUpperCase();
+    const next = normalizeRoomId(launchRoomInput.value);
+    if (next) {
+      selectedRoomId = next;
+      updateLaunchRoomHint(`Ready for ${displayRoomLabel(next)}.`, false);
+    } else {
+      updateLaunchRoomHint("Enter ROOM-1 to ROOM-5.", true);
+    }
+  });
+}
 
 window.addEventListener("resize", () => {
   if (boardZoomAnchorClient) {
