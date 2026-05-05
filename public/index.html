@@ -4,16 +4,31 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PixTogether</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body class="app-gated">
     <div id="launchGate" class="launch-gate" role="dialog" aria-modal="true" aria-labelledby="launchTitle">
       <div class="launch-center">
-        <p id="launchTitle" class="launch-loading-label">LOADING...</p>
-        <div id="launchLoadingBar" class="launch-loading-bar" role="group" aria-label="Fill loading pixels"></div>
-        <div class="launch-hourglass-wrap" aria-hidden="true">
-          <div class="launch-hourglass"></div>
-          <p class="launch-wait-label">PLEASE WAIT...</p>
+        <div class="launch-shell">
+          <p id="launchTitle" class="launch-logo">PIXTOGETHER</p>
+          <p class="launch-subtitle">8-BIT LIVE PIXEL ARENA</p>
+          <div class="launch-menu" role="group" aria-label="Main menu">
+            <button id="launchStartBtn" class="launch-menu-btn" type="button">START</button>
+            <button id="launchJoinBtn" class="launch-menu-btn" type="button">JOIN ROOM</button>
+          </div>
+          <p class="launch-press-start" aria-live="polite">PRESS START TO CONNECT</p>
+          <p class="launch-loading-label">LOADING PIXELS...</p>
+          <div id="launchLoadingBar" class="launch-loading-bar" role="group" aria-label="Fill loading pixels"></div>
+          <div class="launch-hourglass-wrap" aria-hidden="true">
+            <div class="launch-hourglass"></div>
+            <p class="launch-wait-label">PLEASE WAIT...</p>
+          </div>
         </div>
       </div>
     </div>
