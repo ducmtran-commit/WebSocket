@@ -978,6 +978,64 @@ body {
   color: #ff7da8;
 }
 
+.launch-rooms-panel {
+  width: min(420px, 100%);
+  margin: 0 auto 12px;
+  padding: 8px 10px;
+  border: 2px solid #2f3f62;
+  background: #090f1d;
+}
+
+.launch-rooms-title {
+  margin: 0 0 6px;
+  font-family: "Press Start 2P", "Courier New", monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  color: #9db3ff;
+}
+
+.launch-room-list {
+  display: grid;
+  gap: 4px;
+}
+
+.launch-room-item {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  border: 2px solid #243353;
+  border-radius: 0;
+  background: #0e1526;
+  color: #dce5ff;
+  padding: 4px 8px;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  text-align: left;
+}
+
+.launch-room-item.is-selected {
+  border-color: var(--retro-cyan);
+}
+
+.launch-room-item.is-near-cap {
+  border-color: #ff4fd8;
+}
+
+.launch-room-item-label {
+  color: #c4d0ff;
+}
+
+.launch-room-item-count {
+  color: var(--retro-green);
+}
+
+.launch-room-item.is-near-cap .launch-room-item-count {
+  color: #ff7da8;
+}
+
 .launch-menu {
   display: grid;
   gap: 12px;
