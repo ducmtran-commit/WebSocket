@@ -16,6 +16,7 @@ const IDLE_WIPE_MS = Math.max(1, Number(process.env.BOARD_IDLE_WIPE_MINUTES || 4
 const SAVE_DEBOUNCE_MS = Math.max(3000, Number(process.env.BOARD_SAVE_DEBOUNCE_MS || 12000));
 const MAX_ROOMS = Math.max(1, Number(process.env.MAX_ROOMS || 5));
 const MAX_USERS_PER_ROOM = Math.max(1, Number(process.env.MAX_USERS_PER_ROOM || 30));
+const ROOM_JOIN_CODES_ENV = String(process.env.ROOM_JOIN_CODES || "").trim();
 
 const GRID_WIDTH = 256;
 const GRID_HEIGHT = 192;
@@ -24,6 +25,19 @@ const ROOM_IDS = Array.from({ length: MAX_ROOMS }, (_unused, i) => `room-${i + 1
 
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/health", (_req, res) => res.status(200).send("ok"));
+app.get("/api/rooms", (_req, res) => {
+  const payload = ROOM_IDS.map((roomId) => ({
+    id: roomId,
+    label: formatRoomLabel(roomId),
+    users: countOpenClientsInRoom(roomId),
+    capacity: MAX_USERS_PER_ROOM,
+  }));
+  res.json({
+    maxRooms: MAX_ROOMS,
+    maxUsersPerRoom: MAX_USERS_PER_ROOM,
+    rooms: payload,
+  });
+});
 
 const rooms = new Map();
 
@@ -43,6 +57,49 @@ function formatRoomLabel(roomId) {
   const n = Number(String(roomId).split("-")[1]);
   return Number.isInteger(n) ? `ROOM-${n}` : roomId.toUpperCase();
 }
+
+function generateRandomJoinCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for (let i = 0; i < 6; i += 1) {
+    out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return out;
+}
+
+function normalizeJoinCode(value) {
+  if (typeof value !== "string") return "";
+  return value.trim().toUpperCase().slice(0, 20);
+}
+
+function buildRoomJoinCodes() {
+  const byRoom = new Map();
+  if (ROOM_JOIN_CODES_ENV) {
+    const parts = ROOM_JOIN_CODES_ENV.split(",").map((s) => s.trim()).filter(Boolean);
+    for (const part of parts) {
+      if (part.includes(":")) {
+        const [roomRaw, codeRaw] = part.split(":");
+        const roomId = normalizeRequestedRoomId(roomRaw);
+        const code = normalizeJoinCode(codeRaw);
+        if (roomId && code) byRoom.set(roomId, code);
+        continue;
+      }
+      const idx = byRoom.size;
+      if (idx >= ROOM_IDS.length) break;
+      const roomId = ROOM_IDS[idx];
+      const code = normalizeJoinCode(part);
+      if (code) byRoom.set(roomId, code);
+    }
+  }
+  for (const roomId of ROOM_IDS) {
+    if (!byRoom.has(roomId)) {
+      byRoom.set(roomId, generateRandomJoinCode());
+    }
+  }
+  return byRoom;
+}
+
+const roomJoinCodes = buildRoomJoinCodes();
 
 function createRoomState(roomId) {
   return {
@@ -255,6 +312,7 @@ function sendInitState(ws, room) {
     JSON.stringify({
       type: "init-state",
       roomId: room.id,
+      roomJoinCode: roomJoinCodes.get(room.id) || "",
       gridWidth: GRID_WIDTH,
       gridHeight: GRID_HEIGHT,
       pixels: room.pixels,
@@ -330,18 +388,18 @@ function normalizeRequestedRoomId(value) {
   return `room-${n}`;
 }
 
-function assignAvailableRoom() {
-  let best = null;
-  let bestLoad = Number.POSITIVE_INFINITY;
-  for (const roomId of ROOM_IDS) {
-    const load = countOpenClientsInRoom(roomId);
-    if (load >= MAX_USERS_PER_ROOM) continue;
-    if (load < bestLoad) {
-      best = roomId;
-      bestLoad = load;
-    }
-  }
-  return best;
+function assignAvailableRoomRandom() {
+  const openRooms = ROOM_IDS.filter((roomId) => countOpenClientsInRoom(roomId) < MAX_USERS_PER_ROOM);
+  if (openRooms.length === 0) return null;
+  const i = Math.floor(Math.random() * openRooms.length);
+  return openRooms[i];
+}
+
+function isValidRoomCode(roomId, codeInput) {
+  const expected = normalizeJoinCode(roomJoinCodes.get(roomId) || "");
+  const provided = normalizeJoinCode(codeInput);
+  if (!expected || !provided) return false;
+  return provided === expected;
 }
 
 function resolveRoomForConnection(req) {
@@ -353,6 +411,7 @@ function resolveRoomForConnection(req) {
   }
   const mode = String(query.get("mode") || "").toLowerCase();
   const requestedRoom = normalizeRequestedRoomId(query.get("room"));
+  const roomCode = normalizeJoinCode(query.get("code"));
 
   if (mode === "join") {
     if (!requestedRoom) {
@@ -361,14 +420,16 @@ function resolveRoomForConnection(req) {
         errorMessage: `Invalid room. Use ROOM-1 to ROOM-${MAX_ROOMS}.`,
       };
     }
+    if (!isValidRoomCode(requestedRoom, roomCode)) {
+      return {
+        errorCode: 4005,
+        errorMessage: "Invalid room code.",
+      };
+    }
     return { roomId: requestedRoom };
   }
 
-  if (requestedRoom) {
-    return { roomId: requestedRoom };
-  }
-
-  const assigned = assignAvailableRoom();
+  const assigned = assignAvailableRoomRandom();
   if (!assigned) {
     return {
       errorCode: 4004,
