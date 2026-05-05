@@ -10,148 +10,207 @@ const wss = new WebSocketServer({ server });
 const PORT = process.env.PORT || 3000;
 
 const DATA_DIR = path.join(__dirname, "data");
-const BOARD_FILE = path.join(DATA_DIR, "board.json");
+const ROOMS_DIR = path.join(DATA_DIR, "rooms");
 const RETENTION_MS = Math.max(1, Number(process.env.BOARD_RETENTION_HOURS || 48)) * 60 * 60 * 1000;
-// Keep board for 3 days of zero connected clients by default.
 const IDLE_WIPE_MS = Math.max(1, Number(process.env.BOARD_IDLE_WIPE_MINUTES || 4320)) * 60 * 1000;
 const SAVE_DEBOUNCE_MS = Math.max(3000, Number(process.env.BOARD_SAVE_DEBOUNCE_MS || 12000));
+const MAX_ROOMS = Math.max(1, Number(process.env.MAX_ROOMS || 5));
+const MAX_USERS_PER_ROOM = Math.max(1, Number(process.env.MAX_USERS_PER_ROOM || 30));
 
 const GRID_WIDTH = 256;
 const GRID_HEIGHT = 192;
 const DEFAULT_PIXEL = "#0b1220";
+const ROOM_IDS = Array.from({ length: MAX_ROOMS }, (_unused, i) => `room-${i + 1}`);
 
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/health", (_req, res) => res.status(200).send("ok"));
 
-const state = {
-  users: new Map(),
-  pixels: Array.from({ length: GRID_HEIGHT }, () => Array(GRID_WIDTH).fill(DEFAULT_PIXEL)),
-  owners: Array.from({ length: GRID_HEIGHT }, () => Array(GRID_WIDTH).fill(null)),
-  chat: [],
-};
+const rooms = new Map();
 
-let lastActivityAt = Date.now();
-let boardDirty = false;
-let saveDebounceTimer = null;
-let idleWipeTimer = null;
+function createEmptyPixels() {
+  return Array.from({ length: GRID_HEIGHT }, () => Array(GRID_WIDTH).fill(DEFAULT_PIXEL));
+}
+
+function createEmptyOwners() {
+  return Array.from({ length: GRID_HEIGHT }, () => Array(GRID_WIDTH).fill(null));
+}
+
+function roomFile(roomId) {
+  return path.join(ROOMS_DIR, `${roomId}.json`);
+}
+
+function formatRoomLabel(roomId) {
+  const n = Number(String(roomId).split("-")[1]);
+  return Number.isInteger(n) ? `ROOM-${n}` : roomId.toUpperCase();
+}
+
+function createRoomState(roomId) {
+  return {
+    id: roomId,
+    users: new Map(),
+    pixels: createEmptyPixels(),
+    owners: createEmptyOwners(),
+    chat: [],
+    lastActivityAt: Date.now(),
+    boardDirty: false,
+    saveDebounceTimer: null,
+    idleWipeTimer: null,
+    paintBroadcastMerge: new Map(),
+    paintBroadcastTimer: null,
+  };
+}
 
 function isValidSavedPixels(pixels) {
   if (!Array.isArray(pixels) || pixels.length !== GRID_HEIGHT) return false;
-  for (let y = 0; y < GRID_HEIGHT; y++) {
+  for (let y = 0; y < GRID_HEIGHT; y += 1) {
     if (!Array.isArray(pixels[y]) || pixels[y].length !== GRID_WIDTH) return false;
   }
   return true;
 }
 
-function countOpenClients() {
+function countOpenClientsInRoom(roomId) {
   let n = 0;
   for (const client of wss.clients) {
-    if (client.readyState === WebSocket.OPEN) n += 1;
+    if (client.readyState === WebSocket.OPEN && client.roomId === roomId) n += 1;
   }
   return n;
 }
 
-function cancelIdleWipe() {
-  if (idleWipeTimer) {
-    clearTimeout(idleWipeTimer);
-    idleWipeTimer = null;
+function cancelIdleWipe(room) {
+  if (room.idleWipeTimer) {
+    clearTimeout(room.idleWipeTimer);
+    room.idleWipeTimer = null;
   }
 }
 
-function resetBoardToEmpty() {
-  state.pixels = Array.from({ length: GRID_HEIGHT }, () => Array(GRID_WIDTH).fill(DEFAULT_PIXEL));
-  state.owners = Array.from({ length: GRID_HEIGHT }, () => Array(GRID_WIDTH).fill(null));
-  state.chat = [];
+function resetRoomToEmpty(room) {
+  room.pixels = createEmptyPixels();
+  room.owners = createEmptyOwners();
+  room.chat = [];
 }
 
-function performIdleWipe() {
-  idleWipeTimer = null;
-  if (countOpenClients() > 0) return;
-  resetBoardToEmpty();
-  lastActivityAt = Date.now();
-  boardDirty = false;
+function performIdleWipe(roomId) {
+  const room = rooms.get(roomId);
+  if (!room) return;
+  room.idleWipeTimer = null;
+  if (countOpenClientsInRoom(roomId) > 0) return;
+  resetRoomToEmpty(room);
+  room.lastActivityAt = Date.now();
+  room.boardDirty = false;
   try {
-    fs.unlinkSync(BOARD_FILE);
+    fs.unlinkSync(roomFile(roomId));
   } catch {
     // File may not exist.
   }
-  console.log("Board wiped: no clients connected for idle period.");
+  console.log(`${formatRoomLabel(roomId)} wiped after idle timeout.`);
 }
 
-function scheduleIdleWipeIfEmpty() {
-  if (countOpenClients() > 0) return;
-  cancelIdleWipe();
-  idleWipeTimer = setTimeout(performIdleWipe, IDLE_WIPE_MS);
+function scheduleIdleWipeIfEmpty(roomId) {
+  const room = rooms.get(roomId);
+  if (!room) return;
+  if (countOpenClientsInRoom(roomId) > 0) return;
+  cancelIdleWipe(room);
+  room.idleWipeTimer = setTimeout(() => {
+    performIdleWipe(roomId);
+  }, IDLE_WIPE_MS);
 }
 
-function flushBoardSave() {
-  saveDebounceTimer = null;
-  if (!boardDirty) return;
-  boardDirty = false;
+function flushRoomSave(roomId) {
+  const room = rooms.get(roomId);
+  if (!room) return;
+  room.saveDebounceTimer = null;
+  if (!room.boardDirty) return;
+  room.boardDirty = false;
   try {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.mkdirSync(ROOMS_DIR, { recursive: true });
     const payload = JSON.stringify({
       version: 1,
-      lastActivityAt,
-      pixels: state.pixels,
-      chat: state.chat,
+      roomId: room.id,
+      lastActivityAt: room.lastActivityAt,
+      pixels: room.pixels,
+      chat: room.chat,
     });
-    const tmp = `${BOARD_FILE}.tmp`;
+    const file = roomFile(roomId);
+    const tmp = `${file}.tmp`;
     fs.writeFileSync(tmp, payload, "utf8");
-    fs.renameSync(tmp, BOARD_FILE);
+    fs.renameSync(tmp, file);
   } catch (err) {
-    console.warn("Board save failed:", err.message);
-    boardDirty = true;
+    console.warn(`${formatRoomLabel(roomId)} save failed:`, err.message);
+    room.boardDirty = true;
   }
 }
 
-function touchBoardActivity() {
-  lastActivityAt = Date.now();
-  boardDirty = true;
-  if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
-  saveDebounceTimer = setTimeout(flushBoardSave, SAVE_DEBOUNCE_MS);
+function touchRoomActivity(room) {
+  room.lastActivityAt = Date.now();
+  room.boardDirty = true;
+  if (room.saveDebounceTimer) clearTimeout(room.saveDebounceTimer);
+  room.saveDebounceTimer = setTimeout(() => {
+    flushRoomSave(room.id);
+  }, SAVE_DEBOUNCE_MS);
 }
 
-function tryLoadBoardFromDisk() {
+function tryLoadRoomFromDisk(room) {
   try {
-    if (!fs.existsSync(BOARD_FILE)) return;
-    const raw = fs.readFileSync(BOARD_FILE, "utf8");
+    const file = roomFile(room.id);
+    if (!fs.existsSync(file)) return;
+    const raw = fs.readFileSync(file, "utf8");
     const data = JSON.parse(raw);
     const savedAt = Number(data.lastActivityAt) || 0;
     if (Date.now() - savedAt > RETENTION_MS) {
-      fs.unlinkSync(BOARD_FILE);
-      console.log("Discarded saved board: older than retention window.");
+      fs.unlinkSync(file);
+      console.log(`${formatRoomLabel(room.id)} save expired by retention window.`);
       return;
     }
     if (!isValidSavedPixels(data.pixels)) {
-      console.warn("Discarded saved board: invalid pixel grid.");
+      console.warn(`${formatRoomLabel(room.id)} save discarded: invalid grid.`);
       return;
     }
-    state.pixels = data.pixels;
-    state.owners = Array.from({ length: GRID_HEIGHT }, () => Array(GRID_WIDTH).fill(null));
-    state.chat = Array.isArray(data.chat) ? data.chat.slice(-30) : [];
-    lastActivityAt = savedAt;
-    console.log("Restored board from disk (within retention window).");
+    room.pixels = data.pixels;
+    room.owners = createEmptyOwners();
+    room.chat = Array.isArray(data.chat) ? data.chat.slice(-30) : [];
+    room.lastActivityAt = savedAt;
+    console.log(`${formatRoomLabel(room.id)} restored from disk.`);
   } catch (err) {
-    console.warn("Board load failed:", err.message);
+    console.warn(`${formatRoomLabel(room.id)} load failed:`, err.message);
   }
 }
 
-tryLoadBoardFromDisk();
+function ensureRoom(roomId) {
+  let room = rooms.get(roomId);
+  if (room) return room;
+  room = createRoomState(roomId);
+  tryLoadRoomFromDisk(room);
+  rooms.set(roomId, room);
+  return room;
+}
+
+for (const roomId of ROOM_IDS) {
+  ensureRoom(roomId);
+}
 
 setInterval(() => {
-  if (boardDirty && saveDebounceTimer == null) {
-    flushBoardSave();
+  for (const room of rooms.values()) {
+    if (room.boardDirty && room.saveDebounceTimer == null) {
+      flushRoomSave(room.id);
+    }
   }
 }, 60000);
 
 function shutdownPersist() {
-  cancelIdleWipe();
-  if (saveDebounceTimer) {
-    clearTimeout(saveDebounceTimer);
-    saveDebounceTimer = null;
+  for (const room of rooms.values()) {
+    cancelIdleWipe(room);
+    if (room.saveDebounceTimer) {
+      clearTimeout(room.saveDebounceTimer);
+      room.saveDebounceTimer = null;
+    }
+    if (room.paintBroadcastTimer) {
+      clearTimeout(room.paintBroadcastTimer);
+      room.paintBroadcastTimer = null;
+    }
+    if (room.boardDirty) {
+      flushRoomSave(room.id);
+    }
   }
-  if (boardDirty) flushBoardSave();
 }
 
 process.on("SIGINT", () => {
@@ -174,84 +233,175 @@ function safeName(value) {
   return cleaned || "Artist";
 }
 
-function serializeUsers() {
-  return Array.from(state.users.values()).map((user) => ({
+function serializeUsers(room) {
+  return Array.from(room.users.values()).map((user) => ({
     id: user.id,
     name: user.name,
     color: user.color,
   }));
 }
 
-function broadcast(payload) {
+function broadcastToRoom(roomId, payload) {
   const message = JSON.stringify(payload);
   for (const client of wss.clients) {
-    if (client.readyState === WebSocket.OPEN) {
+    if (client.readyState === WebSocket.OPEN && client.roomId === roomId) {
       client.send(message);
     }
   }
 }
 
-function sendInitState(ws) {
+function sendInitState(ws, room) {
   ws.send(
     JSON.stringify({
       type: "init-state",
+      roomId: room.id,
       gridWidth: GRID_WIDTH,
       gridHeight: GRID_HEIGHT,
-      pixels: state.pixels,
-      users: serializeUsers(),
-      chat: state.chat,
+      pixels: room.pixels,
+      users: serializeUsers(room),
+      chat: room.chat,
     })
   );
 }
 
-function broadcastUsers() {
-  broadcast({
+function broadcastUsers(roomId) {
+  const room = rooms.get(roomId);
+  if (!room) return;
+  broadcastToRoom(roomId, {
     type: "users",
-    users: serializeUsers(),
+    users: serializeUsers(room),
   });
 }
 
-function broadcastChat() {
-  broadcast({
+function broadcastChat(roomId) {
+  const room = rooms.get(roomId);
+  if (!room) return;
+  broadcastToRoom(roomId, {
     type: "chat-history",
-    chat: state.chat,
+    chat: room.chat,
   });
 }
 
-function broadcastPixelsUpdated(pixels) {
-  broadcast({
+function broadcastPixelsUpdated(roomId, pixels) {
+  broadcastToRoom(roomId, {
     type: "pixels-updated",
     pixels,
   });
 }
 
-const paintBroadcastMerge = new Map();
-let paintBroadcastTimer = null;
-
-function flushPaintBroadcastMerge() {
-  paintBroadcastTimer = null;
-  if (paintBroadcastMerge.size === 0) return;
-  const pixels = Array.from(paintBroadcastMerge.values());
-  paintBroadcastMerge.clear();
-  broadcastPixelsUpdated(pixels);
+function flushPaintBroadcastMerge(room) {
+  room.paintBroadcastTimer = null;
+  if (room.paintBroadcastMerge.size === 0) return;
+  const pixels = Array.from(room.paintBroadcastMerge.values());
+  room.paintBroadcastMerge.clear();
+  broadcastPixelsUpdated(room.id, pixels);
 }
 
-function mergePaintBroadcastPixels(updates) {
+function mergePaintBroadcastPixels(room, updates) {
   for (const u of updates) {
-    paintBroadcastMerge.set(`${u.x},${u.y}`, u);
+    room.paintBroadcastMerge.set(`${u.x},${u.y}`, u);
   }
-  if (paintBroadcastTimer == null) {
-    paintBroadcastTimer = setTimeout(flushPaintBroadcastMerge, 20);
+  if (room.paintBroadcastTimer == null) {
+    room.paintBroadcastTimer = setTimeout(() => {
+      flushPaintBroadcastMerge(room);
+    }, 20);
   }
 }
 
-function addChat(author, text, authorId = null) {
-  state.chat.push({ author, authorId, text, at: Date.now() });
-  if (state.chat.length > 30) state.chat.shift();
+function addChat(room, author, text, authorId = null) {
+  room.chat.push({ author, authorId, text, at: Date.now() });
+  if (room.chat.length > 30) room.chat.shift();
 }
 
-wss.on("connection", (ws) => {
-  cancelIdleWipe();
+function sanitizeClientKey(value) {
+  if (typeof value !== "string") return null;
+  const s = value.trim().slice(0, 64);
+  if (s.length < 8 || s.length > 64) return null;
+  return /^[a-zA-Z0-9_-]+$/.test(s) ? s : null;
+}
+
+function normalizeRequestedRoomId(value) {
+  if (typeof value !== "string") return null;
+  const cleaned = value.trim().toLowerCase();
+  const roomMatch = cleaned.match(/^room-(\d{1,2})$/);
+  const digitMatch = cleaned.match(/^(\d{1,2})$/);
+  const n = Number(roomMatch?.[1] || digitMatch?.[1]);
+  if (!Number.isInteger(n) || n < 1 || n > MAX_ROOMS) return null;
+  return `room-${n}`;
+}
+
+function assignAvailableRoom() {
+  let best = null;
+  let bestLoad = Number.POSITIVE_INFINITY;
+  for (const roomId of ROOM_IDS) {
+    const load = countOpenClientsInRoom(roomId);
+    if (load >= MAX_USERS_PER_ROOM) continue;
+    if (load < bestLoad) {
+      best = roomId;
+      bestLoad = load;
+    }
+  }
+  return best;
+}
+
+function resolveRoomForConnection(req) {
+  let query = null;
+  try {
+    query = new URL(req.url || "/", "http://localhost").searchParams;
+  } catch {
+    query = new URL("http://localhost").searchParams;
+  }
+  const mode = String(query.get("mode") || "").toLowerCase();
+  const requestedRoom = normalizeRequestedRoomId(query.get("room"));
+
+  if (mode === "join") {
+    if (!requestedRoom) {
+      return {
+        errorCode: 4003,
+        errorMessage: `Invalid room. Use ROOM-1 to ROOM-${MAX_ROOMS}.`,
+      };
+    }
+    return { roomId: requestedRoom };
+  }
+
+  if (requestedRoom) {
+    return { roomId: requestedRoom };
+  }
+
+  const assigned = assignAvailableRoom();
+  if (!assigned) {
+    return {
+      errorCode: 4004,
+      errorMessage: "All rooms are full. Try again later.",
+    };
+  }
+  return { roomId: assigned };
+}
+
+wss.on("connection", (ws, req) => {
+  const resolved = resolveRoomForConnection(req);
+  if (!resolved.roomId) {
+    ws.send(
+      JSON.stringify({
+        type: "room-error",
+        message: resolved.errorMessage || "Unable to assign room.",
+      })
+    );
+    ws.close(resolved.errorCode || 4003, "Room unavailable");
+    return;
+  }
+
+  const roomId = resolved.roomId;
+  if (countOpenClientsInRoom(roomId) >= MAX_USERS_PER_ROOM) {
+    const label = formatRoomLabel(roomId);
+    const msg = `${label} is full (${MAX_USERS_PER_ROOM} max).`;
+    ws.send(JSON.stringify({ type: "room-error", message: msg }));
+    ws.close(4004, `${label} full`);
+    return;
+  }
+
+  const room = ensureRoom(roomId);
+  cancelIdleWipe(room);
 
   const userId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const user = {
@@ -260,25 +410,18 @@ wss.on("connection", (ws) => {
     color: randomColor(),
   };
 
-  state.users.set(userId, user);
+  room.users.set(userId, user);
   ws.userId = userId;
-  /** Stable paint/clear identity; client sends `clientKey` in set-name to survive refresh. */
+  ws.roomId = roomId;
   ws.ownerKey = userId;
   ws.undoStack = [];
   ws.redoStack = [];
 
-  addChat("System", `${user.name} joined the board.`);
-  sendInitState(ws);
-  broadcastUsers();
-  broadcastChat();
-  touchBoardActivity();
-
-  function sanitizeClientKey(value) {
-    if (typeof value !== "string") return null;
-    const s = value.trim().slice(0, 64);
-    if (s.length < 8 || s.length > 64) return null;
-    return /^[a-zA-Z0-9_-]+$/.test(s) ? s : null;
-  }
+  addChat(room, "System", `${user.name} joined ${formatRoomLabel(roomId)}.`);
+  sendInitState(ws, room);
+  broadcastUsers(roomId);
+  broadcastChat(roomId);
+  touchRoomActivity(room);
 
   ws.on("message", (raw) => {
     let msg;
@@ -287,19 +430,21 @@ wss.on("connection", (ws) => {
     } catch {
       return;
     }
-
     if (!msg || typeof msg.type !== "string") return;
-    const current = state.users.get(ws.userId);
+
+    const currentRoom = rooms.get(ws.roomId);
+    if (!currentRoom) return;
+    const current = currentRoom.users.get(ws.userId);
     if (!current) return;
 
     if (msg.type === "set-name") {
       current.name = safeName(msg.name);
       const key = sanitizeClientKey(msg.clientKey);
       if (key) ws.ownerKey = key;
-      addChat("System", `${current.name} updated their name.`);
-      broadcastUsers();
-      broadcastChat();
-      touchBoardActivity();
+      addChat(currentRoom, "System", `${current.name} updated their name.`);
+      broadcastUsers(currentRoom.id);
+      broadcastChat(currentRoom.id);
+      touchRoomActivity(currentRoom);
       return;
     }
 
@@ -318,20 +463,20 @@ wss.on("connection", (ws) => {
         const key = `${x},${y}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        const prevColor = state.pixels[y][x];
-        const prevOwner = state.owners[y][x];
+        const prevColor = currentRoom.pixels[y][x];
+        const prevOwner = currentRoom.owners[y][x];
         if (prevColor === color) continue;
         changes.push({ x, y, from: prevColor, to: color, fromOwner: prevOwner, toOwner: ws.ownerKey });
-        state.pixels[y][x] = color;
-        state.owners[y][x] = ws.ownerKey;
+        currentRoom.pixels[y][x] = color;
+        currentRoom.owners[y][x] = ws.ownerKey;
         updates.push({ x, y, color });
       }
       if (changes.length > 0) {
-        mergePaintBroadcastPixels(updates);
+        mergePaintBroadcastPixels(currentRoom, updates);
         ws.undoStack.push({ changes });
         if (ws.undoStack.length > 80) ws.undoStack.shift();
         ws.redoStack = [];
-        touchBoardActivity();
+        touchRoomActivity(currentRoom);
       }
       return;
     }
@@ -341,14 +486,14 @@ wss.on("connection", (ws) => {
       if (!action) return;
       const updates = [];
       for (const change of action.changes) {
-        state.pixels[change.y][change.x] = change.from;
-        state.owners[change.y][change.x] = change.fromOwner || null;
+        currentRoom.pixels[change.y][change.x] = change.from;
+        currentRoom.owners[change.y][change.x] = change.fromOwner || null;
         updates.push({ x: change.x, y: change.y, color: change.from });
       }
-      broadcastPixelsUpdated(updates);
+      broadcastPixelsUpdated(currentRoom.id, updates);
       ws.redoStack.push(action);
       if (ws.redoStack.length > 80) ws.redoStack.shift();
-      touchBoardActivity();
+      touchRoomActivity(currentRoom);
       return;
     }
 
@@ -357,14 +502,14 @@ wss.on("connection", (ws) => {
       if (!action) return;
       const updates = [];
       for (const change of action.changes) {
-        state.pixels[change.y][change.x] = change.to;
-        state.owners[change.y][change.x] = change.toOwner || null;
+        currentRoom.pixels[change.y][change.x] = change.to;
+        currentRoom.owners[change.y][change.x] = change.toOwner || null;
         updates.push({ x: change.x, y: change.y, color: change.to });
       }
-      broadcastPixelsUpdated(updates);
+      broadcastPixelsUpdated(currentRoom.id, updates);
       ws.undoStack.push(action);
       if (ws.undoStack.length > 80) ws.undoStack.shift();
-      touchBoardActivity();
+      touchRoomActivity(currentRoom);
       return;
     }
 
@@ -372,47 +517,49 @@ wss.on("connection", (ws) => {
       const updates = [];
       for (let y = 0; y < GRID_HEIGHT; y += 1) {
         for (let x = 0; x < GRID_WIDTH; x += 1) {
-          if (state.owners[y][x] !== ws.ownerKey) continue;
-          state.pixels[y][x] = DEFAULT_PIXEL;
-          state.owners[y][x] = null;
+          if (currentRoom.owners[y][x] !== ws.ownerKey) continue;
+          currentRoom.pixels[y][x] = DEFAULT_PIXEL;
+          currentRoom.owners[y][x] = null;
           updates.push({ x, y, color: DEFAULT_PIXEL });
         }
       }
       if (updates.length > 0) {
-        broadcastPixelsUpdated(updates);
+        broadcastPixelsUpdated(currentRoom.id, updates);
       }
       ws.undoStack = [];
       ws.redoStack = [];
-      addChat("System", `${current.name} cleared their drawing.`);
-      broadcastChat();
-      touchBoardActivity();
+      addChat(currentRoom, "System", `${current.name} cleared their drawing.`);
+      broadcastChat(currentRoom.id);
+      touchRoomActivity(currentRoom);
       return;
     }
 
     if (msg.type === "chat") {
       const text = typeof msg.text === "string" ? msg.text.trim().slice(0, 120) : "";
       if (!text) return;
-      addChat(current.name, text, current.id);
-      broadcastChat();
-      touchBoardActivity();
+      addChat(currentRoom, current.name, text, current.id);
+      broadcastChat(currentRoom.id);
+      touchRoomActivity(currentRoom);
     }
   });
 
   ws.on("close", () => {
-    const current = state.users.get(ws.userId);
+    const currentRoom = rooms.get(ws.roomId);
+    if (!currentRoom) return;
+    const current = currentRoom.users.get(ws.userId);
     if (current) {
-      addChat("System", `${current.name} left the board.`);
-      state.users.delete(ws.userId);
-      broadcastUsers();
-      broadcastChat();
+      addChat(currentRoom, "System", `${current.name} left ${formatRoomLabel(currentRoom.id)}.`);
+      currentRoom.users.delete(ws.userId);
+      broadcastUsers(currentRoom.id);
+      broadcastChat(currentRoom.id);
     }
-    scheduleIdleWipeIfEmpty();
+    scheduleIdleWipeIfEmpty(currentRoom.id);
   });
 });
 
 server.listen(PORT, () => {
   console.log(`Pixel Board server running on port ${PORT}`);
   console.log(
-    `Board disk: ${BOARD_FILE} (retention ${RETENTION_MS / 3600000}h, idle wipe after ${IDLE_WIPE_MS / 60000}m with no clients)`
+    `Rooms: ${MAX_ROOMS} total, ${MAX_USERS_PER_ROOM} users each. Saves: ${ROOMS_DIR} (retention ${RETENTION_MS / 3600000}h, idle wipe ${IDLE_WIPE_MS / 60000}m).`
   );
 });
