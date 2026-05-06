@@ -921,6 +921,69 @@ input {
   color: #93c5fd;
 }
 
+.shortcut-help-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(2, 6, 23, 0.7);
+  backdrop-filter: blur(2px);
+}
+
+.shortcut-help-overlay.hidden {
+  display: none;
+}
+
+.shortcut-help-card {
+  width: min(760px, calc(100vw - 24px));
+  max-height: calc(100vh - 28px);
+  overflow: auto;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  background: #0f172a;
+  box-shadow: 0 14px 44px rgba(2, 6, 23, 0.55);
+  padding: 14px 16px;
+}
+
+.shortcut-help-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.shortcut-help-header h2 {
+  margin: 0;
+  font-size: 1.12rem;
+}
+
+.shortcut-help-grid {
+  display: grid;
+  gap: 7px;
+}
+
+.shortcut-help-grid p {
+  margin: 0;
+  color: #dbe5f3;
+}
+
+.shortcut-help-grid kbd {
+  display: inline-block;
+  border: 1px solid #4b648b;
+  border-radius: 6px;
+  background: #182743;
+  color: #eff6ff;
+  font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+  font-size: 0.86em;
+  font-weight: 700;
+  line-height: 1;
+  padding: 4px 7px;
+  white-space: nowrap;
+}
+
 .board {
   display: grid;
   gap: 1px;
