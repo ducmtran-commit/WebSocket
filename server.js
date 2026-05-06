@@ -15,6 +15,7 @@ const RETENTION_MS = Math.max(1, Number(process.env.BOARD_RETENTION_HOURS || 48)
 const PUBLIC_IDLE_WIPE_MS = Math.max(1, Number(process.env.BOARD_IDLE_WIPE_MINUTES || 4320)) * 60 * 1000;
 const PRIVATE_IDLE_DELETE_MS = Math.max(1, Number(process.env.PRIVATE_ROOM_IDLE_DELETE_MINUTES || 60)) * 60 * 1000;
 const SAVE_DEBOUNCE_MS = Math.max(3000, Number(process.env.BOARD_SAVE_DEBOUNCE_MS || 12000));
+const PAINT_BROADCAST_MERGE_MS = Math.max(4, Number(process.env.PAINT_BROADCAST_MERGE_MS || 8));
 const MAX_ROOMS = Math.max(1, Number(process.env.MAX_ROOMS || 5));
 const MAX_USERS_PER_ROOM = Math.max(1, Number(process.env.MAX_USERS_PER_ROOM || 30));
 const PUBLIC_ROOM_ID = "lobby";
@@ -496,7 +497,7 @@ function mergePaintBroadcastPixels(room, updates) {
   if (room.paintBroadcastTimer == null) {
     room.paintBroadcastTimer = setTimeout(() => {
       flushPaintBroadcastMerge(room);
-    }, 20);
+    }, PAINT_BROADCAST_MERGE_MS);
   }
 }
 
