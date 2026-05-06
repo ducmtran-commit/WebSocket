@@ -12,7 +12,8 @@ const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, "data");
 const ROOMS_DIR = path.join(DATA_DIR, "rooms");
 const RETENTION_MS = Math.max(1, Number(process.env.BOARD_RETENTION_HOURS || 48)) * 60 * 60 * 1000;
-const IDLE_WIPE_MS = Math.max(1, Number(process.env.BOARD_IDLE_WIPE_MINUTES || 4320)) * 60 * 1000;
+const PUBLIC_IDLE_WIPE_MS = Math.max(1, Number(process.env.BOARD_IDLE_WIPE_MINUTES || 4320)) * 60 * 1000;
+const PRIVATE_IDLE_DELETE_MS = Math.max(1, Number(process.env.PRIVATE_ROOM_IDLE_DELETE_MINUTES || 60)) * 60 * 1000;
 const SAVE_DEBOUNCE_MS = Math.max(3000, Number(process.env.BOARD_SAVE_DEBOUNCE_MS || 12000));
 const MAX_ROOMS = Math.max(1, Number(process.env.MAX_ROOMS || 5));
 const MAX_USERS_PER_ROOM = Math.max(1, Number(process.env.MAX_USERS_PER_ROOM || 30));
@@ -162,9 +163,10 @@ function scheduleIdleWipeIfEmpty(roomId) {
   if (!room) return;
   if (countOpenClientsInRoom(roomId) > 0) return;
   cancelIdleWipe(room);
+  const idleMs = room.isPublic ? PUBLIC_IDLE_WIPE_MS : PRIVATE_IDLE_DELETE_MS;
   room.idleWipeTimer = setTimeout(() => {
     performIdleWipe(roomId);
-  }, IDLE_WIPE_MS);
+  }, idleMs);
 }
 
 function roomSavePayload(room) {
@@ -718,6 +720,6 @@ wss.on("connection", (ws, req) => {
 server.listen(PORT, () => {
   console.log(`Pixel Board server running on port ${PORT}`);
   console.log(
-    `Rooms: ${MAX_ROOMS} total, ${MAX_USERS_PER_ROOM} users each. Saves: ${ROOMS_DIR} (retention ${RETENTION_MS / 3600000}h, idle wipe ${IDLE_WIPE_MS / 60000}m).`
+    `Rooms: ${MAX_ROOMS} total, ${MAX_USERS_PER_ROOM} users each. Saves: ${ROOMS_DIR} (retention ${RETENTION_MS / 3600000}h, public idle wipe ${PUBLIC_IDLE_WIPE_MS / 60000}m, private idle delete ${PRIVATE_IDLE_DELETE_MS / 60000}m).`
   );
 });
