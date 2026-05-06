@@ -993,6 +993,12 @@ function startWorkspaceDrag(event) {
   }
 }
 
+function isWorkspaceDragPointerMatch(pointerId) {
+  if (workspaceDragPointerId == null) return true;
+  if (typeof pointerId !== "number") return true;
+  return pointerId === workspaceDragPointerId;
+}
+
 function dragWorkspace(event) {
   if (!workspaceDragging || !(workspacePanel instanceof HTMLElement)) return;
   const deltaX = event.clientX - workspaceDragLastX;
@@ -1128,6 +1134,11 @@ if (workspaceHandle instanceof HTMLElement) {
       return;
     }
     startWorkspaceDrag(event);
+  });
+  workspaceHandle.addEventListener("lostpointercapture", () => {
+    if (workspaceDragging) {
+      stopWorkspaceDrag();
+    }
   });
 }
 
@@ -1626,14 +1637,20 @@ window.addEventListener("mouseup", () => {
   stopPainting();
 });
 
-window.addEventListener("pointerup", () => {
-  if (workspaceDragging) {
+window.addEventListener("pointerup", (event) => {
+  if (workspaceDragging && isWorkspaceDragPointerMatch(event.pointerId)) {
     stopWorkspaceDrag();
   }
 });
 
-window.addEventListener("pointercancel", () => {
-  if (workspaceDragging) {
+window.addEventListener("pointermove", (event) => {
+  if (!workspaceDragging) return;
+  if (!isWorkspaceDragPointerMatch(event.pointerId)) return;
+  dragWorkspace(event);
+});
+
+window.addEventListener("pointercancel", (event) => {
+  if (workspaceDragging && isWorkspaceDragPointerMatch(event.pointerId)) {
     stopWorkspaceDrag();
   }
 });
@@ -1657,12 +1674,6 @@ window.addEventListener("mousemove", (event) => {
   }
   if (sectionReorder) {
     moveSectionReorder(event.clientY);
-  } else if (workspaceDragging) {
-    if ((event.buttons & 1) !== 1) {
-      stopWorkspaceDrag();
-    } else {
-      dragWorkspace(event);
-    }
   }
   if (!isPanning) return;
   const deltaX = event.clientX - panStartX;
