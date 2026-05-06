@@ -83,6 +83,7 @@ let workspaceHidden = false;
 let workspaceHideTimer = null;
 let hasEnteredBoard = false;
 const LAUNCH_ENTER_ANIM_MS = 760;
+let launchGateHideTimer = null;
 let sectionReorder = null;
 const SECTION_REORDER_SLOT_UNSET = Symbol("sectionReorderSlot");
 /** Last drop target for placeholder; avoids repeat `insertBefore` / `appendChild` every mousemove. */
@@ -283,12 +284,19 @@ function reconnectToCurrentRoom() {
   beginConnect();
 }
 
+function clearLaunchGateHideTimer() {
+  if (launchGateHideTimer == null) return;
+  window.clearTimeout(launchGateHideTimer);
+  launchGateHideTimer = null;
+}
+
 function isLaunchGateVisible() {
   return launchGate instanceof HTMLElement && !launchGate.classList.contains("hidden");
 }
 
 function closeLaunchOverlay() {
   if (!(launchGate instanceof HTMLElement)) return;
+  clearLaunchGateHideTimer();
   launchGate.classList.remove("workspace-modal");
   launchGate.classList.remove("is-entering");
   launchGate.classList.add("hidden");
@@ -299,6 +307,7 @@ function closeLaunchOverlay() {
 
 function openLaunchOverlayFromWorkspace(mode = "join") {
   if (!(launchGate instanceof HTMLElement)) return;
+  clearLaunchGateHideTimer();
   const overlayMode = mode === "create" ? "create" : "join";
   const roomRaw = workspaceRoomInput instanceof HTMLInputElement ? workspaceRoomInput.value : "";
   const roomId = normalizeRoomId(roomRaw) || PUBLIC_ROOM_ID;
@@ -347,6 +356,7 @@ function returnToLaunchScreen() {
     }
   }
   if (launchGate instanceof HTMLElement) {
+    clearLaunchGateHideTimer();
     launchGate.classList.remove("workspace-modal");
     launchGate.classList.remove("hidden");
     launchGate.classList.remove("is-entering");
@@ -492,10 +502,13 @@ function enterBoardExperience(sourceEvent = null) {
     document.body.classList.add("entering-canvas");
   }
   if (launchGate instanceof HTMLElement) {
+    clearLaunchGateHideTimer();
     launchGate.classList.remove("workspace-modal");
     launchGate.classList.add("is-entering");
-    window.setTimeout(() => {
+    launchGateHideTimer = window.setTimeout(() => {
+      launchGate.classList.remove("is-entering");
       launchGate.classList.add("hidden");
+      launchGateHideTimer = null;
     }, LAUNCH_ENTER_ANIM_MS);
   }
   if (document.activeElement instanceof HTMLElement) {
