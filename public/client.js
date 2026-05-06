@@ -980,6 +980,10 @@ let workspaceFastTap = { t: 0, x: 0, y: 0 };
 /** After a pointer double-tap toggle, ignore native `dblclick` briefly (same gesture). */
 let workspaceSuppressNativeDblUntil = 0;
 
+function isMobileWorkspaceDockMode() {
+  return window.matchMedia("(max-width: 700px)").matches;
+}
+
 function tryWorkspaceFastDoubleTap(event) {
   if (event.pointerType === "mouse" && event.button !== 0) return false;
   if (!(workspacePanel instanceof HTMLElement)) return false;
@@ -1008,6 +1012,7 @@ function tryWorkspaceFastDoubleTap(event) {
 
 function startWorkspaceDrag(event) {
   if (!(workspacePanel instanceof HTMLElement)) return;
+  if (isMobileWorkspaceDockMode()) return;
   workspaceDragging = true;
   workspaceDragLastX = event.clientX;
   workspaceDragLastY = event.clientY;
@@ -1154,6 +1159,7 @@ if (workspaceHandle instanceof HTMLElement) {
     toggleWorkspaceUiCollapsed();
   });
   workspaceHandle.addEventListener("pointerdown", (event) => {
+    if (isMobileWorkspaceDockMode()) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
     if (!(event.target instanceof HTMLElement) || event.target.closest("button")) return;
     event.preventDefault();
