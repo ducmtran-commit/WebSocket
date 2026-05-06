@@ -74,6 +74,7 @@ let shouldAutoHideToolbox = true;
 let workspaceDragging = false;
 let workspaceDragLastX = 0;
 let workspaceDragLastY = 0;
+let workspaceDragPointerId = null;
 let workspaceHidden = false;
 let workspaceHideTimer = null;
 let hasEnteredBoard = false;
@@ -795,7 +796,15 @@ function startWorkspaceDrag(event) {
   workspaceDragging = true;
   workspaceDragLastX = event.clientX;
   workspaceDragLastY = event.clientY;
+  workspaceDragPointerId = typeof event.pointerId === "number" ? event.pointerId : null;
   workspacePanel.classList.add("is-dragging");
+  if (workspaceHandle instanceof HTMLElement && workspaceDragPointerId != null && workspaceHandle.setPointerCapture) {
+    try {
+      workspaceHandle.setPointerCapture(workspaceDragPointerId);
+    } catch {
+      // Ignore capture errors in non-pointer contexts.
+    }
+  }
 }
 
 function dragWorkspace(event) {
@@ -809,6 +818,14 @@ function dragWorkspace(event) {
 
 function stopWorkspaceDrag() {
   if (!(workspacePanel instanceof HTMLElement)) return;
+  if (workspaceHandle instanceof HTMLElement && workspaceDragPointerId != null && workspaceHandle.releasePointerCapture) {
+    try {
+      workspaceHandle.releasePointerCapture(workspaceDragPointerId);
+    } catch {
+      // Ignore if pointer capture already released.
+    }
+  }
+  workspaceDragPointerId = null;
   workspaceDragging = false;
   workspacePanel.classList.remove("is-dragging");
 }
@@ -907,6 +924,14 @@ function stopSectionReorder() {
 }
 
 if (workspaceHandle instanceof HTMLElement) {
+  workspaceHandle.addEventListener("dblclick", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (workspaceDragging) {
+      stopWorkspaceDrag();
+    }
+    toggleWorkspaceUiCollapsed();
+  });
   workspaceHandle.addEventListener("pointerdown", (event) => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
     if (!(event.target instanceof HTMLElement) || event.target.closest("button")) return;
@@ -1294,11 +1319,26 @@ board.addEventListener("mousedown", (event) => {
 
 window.addEventListener("mouseup", () => {
   stopSectionReorder();
+  if (workspaceDragging) {
+    stopWorkspaceDrag();
+  }
   if (isPanning) {
     isPanning = false;
     boardViewport.classList.remove("is-panning");
   }
   stopPainting();
+});
+
+window.addEventListener("pointerup", () => {
+  if (workspaceDragging) {
+    stopWorkspaceDrag();
+  }
+});
+
+window.addEventListener("pointercancel", () => {
+  if (workspaceDragging) {
+    stopWorkspaceDrag();
+  }
 });
 
 boardViewport.addEventListener("mousedown", (event) => {
@@ -1331,11 +1371,17 @@ window.addEventListener("mousemove", (event) => {
 });
 
 window.addEventListener("blur", () => {
+  if (workspaceDragging) {
+    stopWorkspaceDrag();
+  }
   stopPainting();
 });
 
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "visible") {
+    if (workspaceDragging) {
+      stopWorkspaceDrag();
+    }
     stopPainting();
   }
 });
