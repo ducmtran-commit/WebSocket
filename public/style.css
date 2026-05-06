@@ -901,6 +901,13 @@ button {
   background: #334155;
 }
 
+#pencilModeBtn {
+  width: 100%;
+  border-color: #3e5b88;
+  background: #162641;
+  font-weight: 700;
+}
+
 button {
   cursor: pointer;
 }
