@@ -1010,7 +1010,7 @@ body {
 
 .launch-shell.join-mode #launchJoinBtn,
 .launch-shell.create-mode #launchCreateBtn,
-.launch-shell:not(.join-mode):not(.create-mode) #launchStartBtn {
+.launch-shell:not(.create-mode) #launchJoinBtn {
   background: var(--retro-cyan);
   color: #101726;
 }
