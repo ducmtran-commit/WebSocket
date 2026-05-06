@@ -18,25 +18,25 @@
         <div id="launchShell" class="launch-shell">
           <p id="launchTitle" class="launch-logo">PIXTOGETHER</p>
           <p class="launch-subtitle">8-BIT LIVE PIXEL ARENA</p>
-          <div id="launchRoomCodeRow" class="launch-room-row">
+          <div class="launch-room-row">
             <label class="launch-room-label" for="launchRoomInput">ROOM</label>
             <input
               id="launchRoomInput"
               class="launch-room-input"
               type="text"
-              value="ROOM-1"
-              maxlength="8"
+              value="LOBBY"
+              maxlength="20"
               spellcheck="false"
               autocomplete="off"
             />
           </div>
-          <div class="launch-room-row">
-            <label class="launch-room-label" for="launchRoomCodeInput">CODE</label>
+          <div id="launchRoomCodeRow" class="launch-room-row">
+            <label class="launch-room-label" for="launchRoomCodeInput">PASSWORD</label>
             <input
               id="launchRoomCodeInput"
               class="launch-room-input"
               type="text"
-              placeholder="JOIN CODE"
+              placeholder="ROOM PASSWORD"
               maxlength="20"
               spellcheck="false"
               autocomplete="off"
@@ -50,8 +50,9 @@
           <div class="launch-menu" role="group" aria-label="Main menu">
             <button id="launchStartBtn" class="launch-menu-btn" type="button">START</button>
             <button id="launchJoinBtn" class="launch-menu-btn" type="button">JOIN ROOM</button>
+            <button id="launchCreateBtn" class="launch-menu-btn" type="button">CREATE ROOM</button>
           </div>
-          <p class="launch-press-start" aria-live="polite">PRESS START TO ENTER ROOM</p>
+          <p class="launch-press-start" aria-live="polite">START JOINS THE PUBLIC LOBBY</p>
         </div>
       </div>
     </div>
@@ -105,7 +106,7 @@
                 <p id="statusText">Status: connecting...</p>
                 <p id="roomText">Room: -</p>
                 <div class="row">
-                  <button id="copyRoomCodeBtn" type="button">Copy Room Code</button>
+                  <button id="copyRoomCodeBtn" type="button">Copy Room Password</button>
                 </div>
                 <p id="playersText">Artists online: 0</p>
               </div>
