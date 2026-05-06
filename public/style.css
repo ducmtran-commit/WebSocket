@@ -809,6 +809,10 @@ input {
   will-change: transform;
   user-select: none;
   -webkit-user-drag: none;
+  /* Keep board edge visible against viewport background while panning. */
+  box-shadow:
+    0 0 0 2px rgba(68, 247, 248, 0.22),
+    0 0 24px rgba(8, 14, 28, 0.5);
 }
 
 .board-viewport {
@@ -817,10 +821,35 @@ input {
   height: 100vh;
   border: none;
   border-radius: 0;
-  background: #020617;
+  background:
+    repeating-linear-gradient(0deg, rgba(68, 247, 248, 0.05) 0 1px, transparent 1px 18px),
+    repeating-linear-gradient(90deg, rgba(68, 247, 248, 0.05) 0 1px, transparent 1px 18px),
+    #020617;
   cursor: grab;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  position: relative;
+}
+
+.board-viewport::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0 4px,
+    rgba(255, 255, 255, 0.02) 4px 5px
+  );
+  opacity: 0.65;
+}
+
+.board-viewport::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 2px rgba(20, 32, 58, 0.72), inset 0 0 30px rgba(0, 0, 0, 0.45);
 }
 
 .board-viewport::-webkit-scrollbar {
