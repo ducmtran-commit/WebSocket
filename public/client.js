@@ -37,7 +37,6 @@ const workspaceRoomInput = document.getElementById("workspaceRoomInput");
 const workspaceRoomPasswordInput = document.getElementById("workspaceRoomPasswordInput");
 const workspaceJoinRoomBtn = document.getElementById("workspaceJoinRoomBtn");
 const workspaceCreateRoomBtn = document.getElementById("workspaceCreateRoomBtn");
-const workspaceLobbyBtn = document.getElementById("workspaceLobbyBtn");
 const workspaceBackToLaunchBtn = document.getElementById("workspaceBackToLaunchBtn");
 
 let ws;
@@ -171,8 +170,12 @@ function updateRoomUi() {
     roomText.textContent = `Room: ${label}`;
   }
   if (copyRoomCodeBtn instanceof HTMLButtonElement) {
-    copyRoomCodeBtn.disabled = !selectedRoomPassword;
-    copyRoomCodeBtn.textContent = selectedRoomPassword ? "Copy Room Password" : "Copy Room Password (Unavailable)";
+    const workspaceCode =
+      workspaceRoomPasswordInput instanceof HTMLInputElement
+        ? normalizeRoomCode(workspaceRoomPasswordInput.value)
+        : "";
+    copyRoomCodeBtn.disabled = !(workspaceCode || selectedRoomPassword);
+    copyRoomCodeBtn.textContent = "Copy";
   }
   syncWorkspaceRoomControls();
 }
@@ -1820,13 +1823,18 @@ if (launchRoomCodeInput instanceof HTMLInputElement) {
 
 if (copyRoomCodeBtn instanceof HTMLButtonElement) {
   copyRoomCodeBtn.addEventListener("click", async () => {
-    if (!selectedRoomPassword) {
+    const codeFromInput =
+      workspaceRoomPasswordInput instanceof HTMLInputElement
+        ? normalizeRoomCode(workspaceRoomPasswordInput.value)
+        : "";
+    const code = codeFromInput || selectedRoomPassword;
+    if (!code) {
       updateLaunchRoomHint("Room password unavailable yet. Connect first.", true);
       return;
     }
     try {
-      await navigator.clipboard.writeText(selectedRoomPassword);
-      copyRoomCodeBtn.textContent = "Password Copied!";
+      await navigator.clipboard.writeText(code);
+      copyRoomCodeBtn.textContent = "Copied";
       window.setTimeout(() => {
         updateRoomUi();
       }, 1200);
@@ -1838,6 +1846,25 @@ if (copyRoomCodeBtn instanceof HTMLButtonElement) {
 
 function switchRoomFromWorkspace(targetMode) {
   const mode = targetMode === "create" ? "create" : targetMode === "join" ? "join" : "start";
+  if (mode === "join") {
+    const roomRaw = workspaceRoomInput instanceof HTMLInputElement ? workspaceRoomInput.value : "";
+    const requestedRoom = normalizeRoomId(roomRaw) || PUBLIC_ROOM_ID;
+    const requestedPassword = normalizeRoomCode(
+      workspaceRoomPasswordInput instanceof HTMLInputElement ? workspaceRoomPasswordInput.value : ""
+    );
+    setSelectedRoom(requestedRoom);
+    selectedRoomPassword = requestedPassword;
+    updateRoomUi();
+    returnToLaunchScreen();
+    setLaunchConnectMode(requestedRoom === PUBLIC_ROOM_ID ? "start" : "join");
+    updateLaunchRoomHint("Select an available room and press JOIN ROOM.", false);
+    void refreshRoomPresence();
+    if (launchRoomInput instanceof HTMLInputElement) {
+      launchRoomInput.focus({ preventScroll: true });
+      launchRoomInput.select();
+    }
+    return;
+  }
   if (mode === "start") {
     setSelectedRoom(PUBLIC_ROOM_ID);
     selectedRoomPassword = "";
@@ -1888,12 +1915,6 @@ if (workspaceCreateRoomBtn instanceof HTMLButtonElement) {
   });
 }
 
-if (workspaceLobbyBtn instanceof HTMLButtonElement) {
-  workspaceLobbyBtn.addEventListener("click", () => {
-    switchRoomFromWorkspace("start");
-  });
-}
-
 if (workspaceBackToLaunchBtn instanceof HTMLButtonElement) {
   workspaceBackToLaunchBtn.addEventListener("click", () => {
     returnToLaunchScreen();
@@ -1903,6 +1924,13 @@ if (workspaceBackToLaunchBtn instanceof HTMLButtonElement) {
 if (workspaceRoomInput instanceof HTMLInputElement) {
   workspaceRoomInput.addEventListener("input", () => {
     workspaceRoomInput.value = workspaceRoomInput.value.toLowerCase();
+  });
+}
+
+if (workspaceRoomPasswordInput instanceof HTMLInputElement) {
+  workspaceRoomPasswordInput.addEventListener("input", () => {
+    selectedRoomPassword = normalizeRoomCode(workspaceRoomPasswordInput.value);
+    updateRoomUi();
   });
 }
 
