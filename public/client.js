@@ -81,7 +81,6 @@ let workspaceDragLastX = 0;
 let workspaceDragLastY = 0;
 let workspaceDragPointerId = null;
 const WORKSPACE_DRAG_HOLD_MS = 170;
-const WORKSPACE_DRAG_HOLD_MOVE_CANCEL_PX = 10;
 let workspacePendingDrag = null;
 let workspaceDragHoldTimer = null;
 let workspaceHidden = false;
@@ -1057,12 +1056,7 @@ if (workspaceHandle instanceof HTMLElement) {
   workspaceHandle.addEventListener("pointermove", (event) => {
     if (!workspacePendingDrag) return;
     if (workspacePendingDrag.pointerId != null && workspacePendingDrag.pointerId !== event.pointerId) return;
-    const dx = event.clientX - workspacePendingDrag.startX;
-    const dy = event.clientY - workspacePendingDrag.startY;
-    if (dx * dx + dy * dy > WORKSPACE_DRAG_HOLD_MOVE_CANCEL_PX * WORKSPACE_DRAG_HOLD_MOVE_CANCEL_PX) {
-      clearWorkspacePendingDrag();
-      return;
-    }
+    // Keep latest pointer position while waiting for hold timer; do not cancel for small motion.
     workspacePendingDrag.clientX = event.clientX;
     workspacePendingDrag.clientY = event.clientY;
   });
