@@ -1493,19 +1493,29 @@ function paintCellFromEvent(event) {
 }
 
 /** Max DOM updates per frame for merged `pixels-updated` batches (keeps UI responsive). */
-const REMOTE_PIXEL_APPLY_CHUNK = 450;
+const REMOTE_PIXEL_APPLY_CHUNK = 900;
+/** Time budget (ms) for remote pixel apply each frame. */
+const REMOTE_PIXEL_APPLY_BUDGET_MS = 6;
+/** Small remote updates are applied immediately to reduce perceived lag. */
+const REMOTE_PIXEL_IMMEDIATE_APPLY_MAX = 120;
+
+function applyPendingRemotePixels(limit, budgetMs) {
+  const start = performance.now();
+  let applied = 0;
+  for (const key of pendingRemotePixels.keys()) {
+    if (applied >= limit) break;
+    if (performance.now() - start >= budgetMs) break;
+    const pixel = pendingRemotePixels.get(key);
+    pendingRemotePixels.delete(key);
+    applyPixel(Number(pixel.x), Number(pixel.y), pixel.color);
+    applied += 1;
+  }
+}
 
 function flushRemotePixelBatch() {
   remotePixelFlushRaf = null;
   if (pendingRemotePixels.size === 0) return;
-  let n = 0;
-  for (const key of pendingRemotePixels.keys()) {
-    if (n >= REMOTE_PIXEL_APPLY_CHUNK) break;
-    const pixel = pendingRemotePixels.get(key);
-    pendingRemotePixels.delete(key);
-    applyPixel(Number(pixel.x), Number(pixel.y), pixel.color);
-    n += 1;
-  }
+  applyPendingRemotePixels(REMOTE_PIXEL_APPLY_CHUNK, REMOTE_PIXEL_APPLY_BUDGET_MS);
   if (pendingRemotePixels.size > 0) {
     remotePixelFlushRaf = requestAnimationFrame(flushRemotePixelBatch);
   }
@@ -1519,12 +1529,17 @@ function queueRemotePixels(pixels) {
     if (!Number.isInteger(x) || !Number.isInteger(y)) continue;
     pendingRemotePixels.set(`${x},${y}`, { x, y, color: p.color });
   }
+  if (pendingRemotePixels.size <= REMOTE_PIXEL_IMMEDIATE_APPLY_MAX) {
+    applyPendingRemotePixels(REMOTE_PIXEL_IMMEDIATE_APPLY_MAX, 3.5);
+  }
+  if (pendingRemotePixels.size === 0) return;
   if (remotePixelFlushRaf == null) {
     remotePixelFlushRaf = requestAnimationFrame(flushRemotePixelBatch);
   }
 }
 
 const MAX_PAINT_BATCH = 360;
+const PAINT_SEND_INTERVAL_MS = 8;
 
 function flushPaintBatch() {
   flushTimer = null;
@@ -1555,7 +1570,7 @@ function commitPendingPaintAction() {
 
 function scheduleFlush() {
   if (flushTimer) return;
-  flushTimer = window.setTimeout(flushPaintBatch, 14);
+  flushTimer = window.setTimeout(flushPaintBatch, PAINT_SEND_INTERVAL_MS);
 }
 
 function releasePaintCapture() {
