@@ -57,6 +57,14 @@ function roomFile(roomId) {
   return path.join(ROOMS_DIR, `${roomId}.json`);
 }
 
+function roomHasSavedState(roomId) {
+  try {
+    return fs.existsSync(roomFile(roomId));
+  } catch {
+    return false;
+  }
+}
+
 function removeRoomSaveFile(roomId) {
   try {
     fs.unlinkSync(roomFile(roomId));
@@ -438,13 +446,19 @@ function resolveRoomForConnection(req) {
         errorMessage: "Invalid room name.",
       };
     }
-    if (!existingRoom) {
+    let roomForJoin = existingRoom;
+    if (!roomForJoin && roomHasSavedState(requestedRoom)) {
+      roomForJoin = ensureRoom(requestedRoom, {
+        isPublic: requestedRoom === PUBLIC_ROOM_ID,
+      });
+    }
+    if (!roomForJoin) {
       return {
         errorCode: 4006,
         errorMessage: "Room does not exist.",
       };
     }
-    if (!isPasswordValidForRoom(existingRoom, password)) {
+    if (!isPasswordValidForRoom(roomForJoin, password)) {
       return {
         errorCode: 4005,
         errorMessage: "Invalid room password.",
@@ -466,7 +480,7 @@ function resolveRoomForConnection(req) {
         errorMessage: "Password must be at least 4 characters.",
       };
     }
-    if (existingRoom) {
+    if (existingRoom || roomHasSavedState(requestedRoom)) {
       return {
         errorCode: 4008,
         errorMessage: "Room already exists. Use Join Room.",
