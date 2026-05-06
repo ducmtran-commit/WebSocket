@@ -53,6 +53,8 @@ let isErasing = false;
 let lastPaintGrid = null;
 /** Pointer capture id while painting (keeps events if cursor leaves board briefly). */
 let paintCapturePointerId = null;
+/** Active pointer id for touch/pen painting sessions. */
+let activePaintPointerId = null;
 /** Coalesce remote pixel updates to one apply pass per animation frame. */
 const pendingRemotePixels = new Map();
 let remotePixelFlushRaf = null;
@@ -65,7 +67,8 @@ const BOARD_PADDING_PX = 8;
 const BOARD_GRID_GAP_PX = 1;
 const CELL_STRIDE_PX = BASE_PIXEL_SIZE + BOARD_GRID_GAP_PX;
 const MIN_ZOOM = 0.7;
-const MAX_ZOOM = 1.4;
+const DESKTOP_MAX_ZOOM = 1.8;
+const MOBILE_MAX_ZOOM = 1.6;
 let zoomLevel = 1;
 /** Last pointer position over the board viewport (for zoom +/- / slider to zoom toward cursor). */
 let boardZoomAnchorClient = null;
@@ -773,6 +776,7 @@ function clearBoardLocal() {
 
 function getEffectiveMinZoom() {
   if (!(board instanceof HTMLElement) || !(boardViewport instanceof HTMLElement)) return MIN_ZOOM;
+  const maxZoom = getEffectiveMaxZoom();
   const boardWidth = board.offsetWidth;
   const boardHeight = board.offsetHeight;
   if (boardWidth <= 0 || boardHeight <= 0) return MIN_ZOOM;
@@ -780,7 +784,13 @@ function getEffectiveMinZoom() {
   const fitByWidth = boardViewport.clientWidth / boardWidth;
   const fitByHeight = boardViewport.clientHeight / boardHeight;
   const fitZoom = Math.max(fitByWidth, fitByHeight);
-  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, fitZoom));
+  return Math.min(maxZoom, Math.max(MIN_ZOOM, fitZoom));
+}
+
+function getEffectiveMaxZoom() {
+  return window.matchMedia("(hover: none) and (pointer: coarse)").matches
+    ? MOBILE_MAX_ZOOM
+    : DESKTOP_MAX_ZOOM;
 }
 
 function updateZoomSliderVisual() {
@@ -799,8 +809,10 @@ function updateZoomSliderVisual() {
 function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
   const prevZoom = zoomLevel;
   const minZoom = getEffectiveMinZoom();
+  const maxZoom = getEffectiveMaxZoom();
   zoomInput.min = String(minZoom);
-  const clamped = Math.min(MAX_ZOOM, Math.max(minZoom, Number(nextZoom)));
+  zoomInput.max = String(maxZoom);
+  const clamped = Math.min(maxZoom, Math.max(minZoom, Number(nextZoom)));
   if (!Number.isFinite(clamped)) return;
 
   const viewportRect = boardViewport.getBoundingClientRect();
@@ -954,9 +966,7 @@ function toggleWorkspaceHidden() {
 
 function toggleWorkspaceUiCollapsed() {
   if (!(workspacePanel instanceof HTMLElement)) return;
-  stopSectionReorder();
-  workspacePanel.classList.toggle("workspace-ui-collapsed");
-  syncWorkspaceCollapseButton();
+  setWorkspaceUiCollapsed(!workspacePanel.classList.contains("workspace-ui-collapsed"));
 }
 
 function isWorkspaceDblclickToggleTarget(target) {
@@ -979,9 +989,26 @@ const WORKSPACE_DBL_TAP_PX = 34;
 let workspaceFastTap = { t: 0, x: 0, y: 0 };
 /** After a pointer double-tap toggle, ignore native `dblclick` briefly (same gesture). */
 let workspaceSuppressNativeDblUntil = 0;
+let workspaceSwipeStart = null;
+let multiFingerTapCandidate = null;
+let lastTwoFingerTapAt = 0;
+let lastThreeFingerTapAt = 0;
+let activeBoardTouchCount = 0;
+let blockTouchPaintUntil = 0;
+const TWO_FINGER_TAP_MAX_MS = 260;
+const TWO_FINGER_TAP_MAX_MOVE_PX = 36;
+const TWO_FINGER_DOUBLE_TAP_MS = 420;
+const THREE_FINGER_DOUBLE_TAP_MS = 420;
 
 function isMobileWorkspaceDockMode() {
   return window.matchMedia("(max-width: 700px)").matches;
+}
+
+function setWorkspaceUiCollapsed(shouldCollapse) {
+  if (!(workspacePanel instanceof HTMLElement)) return;
+  stopSectionReorder();
+  workspacePanel.classList.toggle("workspace-ui-collapsed", Boolean(shouldCollapse));
+  syncWorkspaceCollapseButton();
 }
 
 function tryWorkspaceFastDoubleTap(event) {
@@ -1170,6 +1197,54 @@ if (workspaceHandle instanceof HTMLElement) {
     }
     startWorkspaceDrag(event);
   });
+  workspaceHandle.addEventListener(
+    "touchstart",
+    (event) => {
+      if (!isMobileWorkspaceDockMode()) return;
+      if (event.touches.length !== 1) {
+        workspaceSwipeStart = null;
+        return;
+      }
+      const t = event.touches[0];
+      workspaceSwipeStart = { x: t.clientX, y: t.clientY };
+    },
+    { passive: true }
+  );
+  workspaceHandle.addEventListener(
+    "touchmove",
+    (event) => {
+      if (!isMobileWorkspaceDockMode() || !workspaceSwipeStart) return;
+      if (event.touches.length !== 1) {
+        workspaceSwipeStart = null;
+        return;
+      }
+      const t = event.touches[0];
+      const dx = t.clientX - workspaceSwipeStart.x;
+      const dy = t.clientY - workspaceSwipeStart.y;
+      if (dy > 18 && Math.abs(dx) < 56) {
+        event.preventDefault();
+      }
+    },
+    { passive: false }
+  );
+  workspaceHandle.addEventListener(
+    "touchend",
+    (event) => {
+      if (!isMobileWorkspaceDockMode() || !workspaceSwipeStart) return;
+      const t = event.changedTouches?.[0];
+      if (!t) {
+        workspaceSwipeStart = null;
+        return;
+      }
+      const dx = t.clientX - workspaceSwipeStart.x;
+      const dy = t.clientY - workspaceSwipeStart.y;
+      workspaceSwipeStart = null;
+      if (dy > 54 && Math.abs(dx) < 64) {
+        setWorkspaceUiCollapsed(true);
+      }
+    },
+    { passive: true }
+  );
   workspaceHandle.addEventListener("lostpointercapture", () => {
     if (workspaceDragging) {
       stopWorkspaceDrag();
@@ -1631,9 +1706,24 @@ function releasePaintCapture() {
   paintCapturePointerId = null;
 }
 
+function beginPainting(clientX, clientY, pointerId = null) {
+  lastPaintGrid = null;
+  isPainting = true;
+  activePaintPointerId = typeof pointerId === "number" ? pointerId : null;
+  setToolboxDrawingHidden(true);
+  paintAtClient(clientX, clientY);
+  scheduleFlush();
+}
+
+function continuePainting(clientX, clientY) {
+  paintAtClient(clientX, clientY);
+  scheduleFlush();
+}
+
 function stopPainting() {
   if (!isPainting) return;
   isPainting = false;
+  activePaintPointerId = null;
   lastPaintGrid = null;
   releasePaintCapture();
   setToolboxDrawingHidden(false);
@@ -1645,10 +1735,19 @@ board.addEventListener("mousedown", (event) => {
   if (shouldStartPanning(event)) return;
   if (event.button !== 0) return;
   event.preventDefault();
-  lastPaintGrid = null;
-  isPainting = true;
-  setToolboxDrawingHidden(true);
-  if (typeof event.pointerId === "number" && board.setPointerCapture) {
+  beginPainting(event.clientX, event.clientY);
+});
+
+board.addEventListener("pointerdown", (event) => {
+  if (event.pointerType === "mouse") return;
+  if (isPanning) return;
+  if (multiFingerTapCandidate) return;
+  if (event.pointerType === "touch") {
+    if (activeBoardTouchCount > 1) return;
+    if (performance.now() < blockTouchPaintUntil) return;
+  }
+  event.preventDefault();
+  if (board.setPointerCapture) {
     try {
       board.setPointerCapture(event.pointerId);
       paintCapturePointerId = event.pointerId;
@@ -1656,8 +1755,31 @@ board.addEventListener("mousedown", (event) => {
       paintCapturePointerId = null;
     }
   }
-  paintCellFromEvent(event);
-  scheduleFlush();
+  beginPainting(event.clientX, event.clientY, event.pointerId);
+});
+
+board.addEventListener("pointermove", (event) => {
+  if (!isPainting) return;
+  if (event.pointerType === "mouse") return;
+  if (event.pointerType === "touch" && activeBoardTouchCount > 1) {
+    stopPainting();
+    return;
+  }
+  if (activePaintPointerId != null && event.pointerId !== activePaintPointerId) return;
+  event.preventDefault();
+  continuePainting(event.clientX, event.clientY);
+});
+
+board.addEventListener("pointerup", (event) => {
+  if (event.pointerType === "mouse") return;
+  if (activePaintPointerId != null && event.pointerId !== activePaintPointerId) return;
+  stopPainting();
+});
+
+board.addEventListener("pointercancel", (event) => {
+  if (event.pointerType === "mouse") return;
+  if (activePaintPointerId != null && event.pointerId !== activePaintPointerId) return;
+  stopPainting();
 });
 
 window.addEventListener("mouseup", () => {
@@ -1872,6 +1994,90 @@ if (boardViewport instanceof HTMLElement) {
   boardViewport.addEventListener("pointerleave", () => {
     boardZoomAnchorClient = null;
   });
+  boardViewport.addEventListener(
+    "touchstart",
+    (event) => {
+      const fingers = event.touches.length;
+      activeBoardTouchCount = fingers;
+      if (fingers !== 2 && fingers !== 3) {
+        multiFingerTapCandidate = null;
+        return;
+      }
+      // Briefly block touch paint so multi-finger gestures never leave accidental marks.
+      blockTouchPaintUntil = performance.now() + 220;
+      stopPainting();
+      const a = event.touches[0];
+      const b = event.touches[1];
+      multiFingerTapCandidate = {
+        fingers,
+        at: performance.now(),
+        centerX: (a.clientX + b.clientX) / 2,
+        centerY: (a.clientY + b.clientY) / 2,
+      };
+    },
+    { passive: true }
+  );
+  boardViewport.addEventListener(
+    "touchmove",
+    (event) => {
+      activeBoardTouchCount = event.touches.length;
+      if (!multiFingerTapCandidate || event.touches.length !== multiFingerTapCandidate.fingers) return;
+      const a = event.touches[0];
+      const b = event.touches[1];
+      const cx = (a.clientX + b.clientX) / 2;
+      const cy = (a.clientY + b.clientY) / 2;
+      const dx = cx - multiFingerTapCandidate.centerX;
+      const dy = cy - multiFingerTapCandidate.centerY;
+      if (dx * dx + dy * dy > TWO_FINGER_TAP_MAX_MOVE_PX * TWO_FINGER_TAP_MAX_MOVE_PX) {
+        multiFingerTapCandidate = null;
+      }
+    },
+    { passive: true }
+  );
+  boardViewport.addEventListener(
+    "touchend",
+    (event) => {
+      activeBoardTouchCount = event.touches.length;
+      if (!multiFingerTapCandidate) return;
+      if (event.touches.length > 0) return;
+      const now = performance.now();
+      const dt = now - multiFingerTapCandidate.at;
+      const fingers = multiFingerTapCandidate.fingers;
+      multiFingerTapCandidate = null;
+      if (dt > TWO_FINGER_TAP_MAX_MS) return;
+      if (fingers === 2) {
+        if (now - lastTwoFingerTapAt <= TWO_FINGER_DOUBLE_TAP_MS) {
+          event.preventDefault();
+          lastTwoFingerTapAt = 0;
+          flushPaintBatch();
+          send({ type: "undo" });
+          return;
+        }
+        lastTwoFingerTapAt = now;
+        return;
+      }
+      if (fingers === 3) {
+        if (now - lastThreeFingerTapAt <= THREE_FINGER_DOUBLE_TAP_MS) {
+          event.preventDefault();
+          lastThreeFingerTapAt = 0;
+          flushPaintBatch();
+          send({ type: "redo" });
+          return;
+        }
+        lastThreeFingerTapAt = now;
+      }
+    },
+    { passive: false }
+  );
+  boardViewport.addEventListener(
+    "touchcancel",
+    () => {
+      activeBoardTouchCount = 0;
+      multiFingerTapCandidate = null;
+      stopPainting();
+    },
+    { passive: true }
+  );
 }
 
 sendChatBtn.addEventListener("click", () => {
