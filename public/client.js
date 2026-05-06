@@ -24,6 +24,7 @@ const workspaceScroll = document.getElementById("workspaceScroll");
 const workspaceSectionStack = document.getElementById("workspaceSectionStack");
 const workspaceCollapseBtn = document.getElementById("workspaceCollapseBtn");
 const autoHideBtn = document.getElementById("autoHideBtn");
+const shortcutHelpOpenBtn = document.getElementById("shortcutHelpOpenBtn");
 const launchGate = document.getElementById("launchGate");
 const launchShell = document.getElementById("launchShell");
 const launchJoinBtn = document.getElementById("launchJoinBtn");
@@ -1886,6 +1887,13 @@ if (shortcutHelpCloseBtn instanceof HTMLButtonElement) {
   });
 }
 
+if (shortcutHelpOpenBtn instanceof HTMLButtonElement) {
+  shortcutHelpOpenBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setShortcutHelpOpen(true);
+  });
+}
+
 if (shortcutHelpOverlay instanceof HTMLElement) {
   shortcutHelpOverlay.addEventListener("click", (event) => {
     if (event.target !== shortcutHelpOverlay) return;
@@ -1929,6 +1937,18 @@ window.addEventListener("keydown", (event) => {
   }
   if (!canUseCanvasShortcut) return;
   const key = event.key.toLowerCase();
+  if (!event.ctrlKey && !event.metaKey && !event.altKey && key === "c") {
+    event.preventDefault();
+    commitPendingPaintAction();
+    if (isErasing) {
+      isErasing = false;
+      eraserBtn.textContent = "Eraser: Off";
+      toolText.textContent = "Tool: Brush";
+    }
+    colorInput.focus({ preventScroll: true });
+    colorInput.click();
+    return;
+  }
   if (!event.ctrlKey && !event.metaKey && !event.altKey && key === "e") {
     event.preventDefault();
     commitPendingPaintAction();
