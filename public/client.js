@@ -283,6 +283,53 @@ function reconnectToCurrentRoom() {
   beginConnect();
 }
 
+function isLaunchGateVisible() {
+  return launchGate instanceof HTMLElement && !launchGate.classList.contains("hidden");
+}
+
+function closeLaunchOverlay() {
+  if (!(launchGate instanceof HTMLElement)) return;
+  launchGate.classList.remove("workspace-modal");
+  launchGate.classList.remove("is-entering");
+  launchGate.classList.add("hidden");
+  if (hasEnteredBoard) {
+    stopRoomPresencePolling();
+  }
+}
+
+function openLaunchOverlayFromWorkspace(mode = "join") {
+  if (!(launchGate instanceof HTMLElement)) return;
+  const overlayMode = mode === "create" ? "create" : "join";
+  const roomRaw = workspaceRoomInput instanceof HTMLInputElement ? workspaceRoomInput.value : "";
+  const roomId = normalizeRoomId(roomRaw) || PUBLIC_ROOM_ID;
+  const roomPassword = normalizeRoomCode(
+    workspaceRoomPasswordInput instanceof HTMLInputElement ? workspaceRoomPasswordInput.value : ""
+  );
+  setSelectedRoom(roomId);
+  selectedRoomPassword = roomPassword;
+  updateRoomUi();
+  launchGate.classList.remove("hidden");
+  launchGate.classList.remove("is-entering");
+  launchGate.classList.add("workspace-modal");
+  if (document.body instanceof HTMLElement) {
+    document.body.classList.remove("app-gated");
+    document.body.classList.remove("entering-canvas");
+  }
+  setLaunchConnectMode(overlayMode, { focusCode: overlayMode !== "create" });
+  updateLaunchRoomHint(
+    overlayMode === "create"
+      ? "Choose room + password, then press CREATE ROOM."
+      : "Select available room, then press JOIN ROOM.",
+    false
+  );
+  void refreshRoomPresence();
+  startRoomPresencePolling();
+  if (launchRoomInput instanceof HTMLInputElement && overlayMode === "create") {
+    launchRoomInput.focus({ preventScroll: true });
+    launchRoomInput.select();
+  }
+}
+
 function returnToLaunchScreen() {
   if (!hasEnteredBoard) return;
   hasEnteredBoard = false;
@@ -300,6 +347,7 @@ function returnToLaunchScreen() {
     }
   }
   if (launchGate instanceof HTMLElement) {
+    launchGate.classList.remove("workspace-modal");
     launchGate.classList.remove("hidden");
     launchGate.classList.remove("is-entering");
   }
@@ -377,7 +425,7 @@ function startRoomPresencePolling() {
   if (roomPresencePollTimer != null) return;
   void refreshRoomPresence();
   roomPresencePollTimer = window.setInterval(() => {
-    if (hasEnteredBoard) {
+    if (hasEnteredBoard && !isLaunchGateVisible()) {
       stopRoomPresencePolling();
       return;
     }
@@ -444,6 +492,7 @@ function enterBoardExperience(sourceEvent = null) {
     document.body.classList.add("entering-canvas");
   }
   if (launchGate instanceof HTMLElement) {
+    launchGate.classList.remove("workspace-modal");
     launchGate.classList.add("is-entering");
     window.setTimeout(() => {
       launchGate.classList.add("hidden");
@@ -1670,6 +1719,10 @@ window.addEventListener("keydown", (event) => {
   if (!hasEnteredBoard) return;
   if (event.code === "Escape" && canUseCanvasShortcut) {
     event.preventDefault();
+    if (isLaunchGateVisible()) {
+      closeLaunchOverlay();
+      return;
+    }
     returnToLaunchScreen();
     return;
   }
@@ -1748,7 +1801,6 @@ if (lastSession) {
 
 if (launchJoinBtn instanceof HTMLButtonElement) {
   launchJoinBtn.addEventListener("click", (event) => {
-    if (hasEnteredBoard) return;
     const requested = normalizeRoomId(launchRoomInput instanceof HTMLInputElement ? launchRoomInput.value : "");
     if (!requested || requested === PUBLIC_ROOM_ID) {
       setLaunchConnectMode("start");
@@ -1756,7 +1808,13 @@ if (launchJoinBtn instanceof HTMLButtonElement) {
       selectedRoomPassword = "";
       updateRoomUi();
       updateLaunchRoomHint("Joining LOBBY...", false);
-      enterBoardExperience(event);
+      if (hasEnteredBoard) {
+        saveBoardSession();
+        closeLaunchOverlay();
+        reconnectToCurrentRoom();
+      } else {
+        enterBoardExperience(event);
+      }
       return;
     }
     setLaunchConnectMode("join", { focusCode: true });
@@ -1771,13 +1829,18 @@ if (launchJoinBtn instanceof HTMLButtonElement) {
     selectedRoomPassword = password;
     updateRoomUi();
     updateLaunchRoomHint(`Joining ${displayRoomLabel(requested)}...`, false);
-    enterBoardExperience(event);
+    if (hasEnteredBoard) {
+      saveBoardSession();
+      closeLaunchOverlay();
+      reconnectToCurrentRoom();
+    } else {
+      enterBoardExperience(event);
+    }
   });
 }
 
 if (launchCreateBtn instanceof HTMLButtonElement) {
   launchCreateBtn.addEventListener("click", (event) => {
-    if (hasEnteredBoard) return;
     setLaunchConnectMode("create", { focusCode: true });
     const requested = normalizeRoomId(launchRoomInput instanceof HTMLInputElement ? launchRoomInput.value : "");
     if (!requested || requested === PUBLIC_ROOM_ID) {
@@ -1796,7 +1859,13 @@ if (launchCreateBtn instanceof HTMLButtonElement) {
     updateRoomUi();
     updateLaunchRoomHint(`Creating ${displayRoomLabel(requested)}...`, false);
     void refreshRoomPresence();
-    enterBoardExperience(event);
+    if (hasEnteredBoard) {
+      saveBoardSession();
+      closeLaunchOverlay();
+      reconnectToCurrentRoom();
+    } else {
+      enterBoardExperience(event);
+    }
   });
 }
 
@@ -1847,22 +1916,11 @@ if (copyRoomCodeBtn instanceof HTMLButtonElement) {
 function switchRoomFromWorkspace(targetMode) {
   const mode = targetMode === "create" ? "create" : targetMode === "join" ? "join" : "start";
   if (mode === "join") {
-    const roomRaw = workspaceRoomInput instanceof HTMLInputElement ? workspaceRoomInput.value : "";
-    const requestedRoom = normalizeRoomId(roomRaw) || PUBLIC_ROOM_ID;
-    const requestedPassword = normalizeRoomCode(
-      workspaceRoomPasswordInput instanceof HTMLInputElement ? workspaceRoomPasswordInput.value : ""
-    );
-    setSelectedRoom(requestedRoom);
-    selectedRoomPassword = requestedPassword;
-    updateRoomUi();
-    returnToLaunchScreen();
-    setLaunchConnectMode(requestedRoom === PUBLIC_ROOM_ID ? "start" : "join");
-    updateLaunchRoomHint("Select an available room and press JOIN ROOM.", false);
-    void refreshRoomPresence();
-    if (launchRoomInput instanceof HTMLInputElement) {
-      launchRoomInput.focus({ preventScroll: true });
-      launchRoomInput.select();
-    }
+    openLaunchOverlayFromWorkspace("join");
+    return;
+  }
+  if (mode === "create") {
+    openLaunchOverlayFromWorkspace("create");
     return;
   }
   if (mode === "start") {
@@ -1931,6 +1989,15 @@ if (workspaceRoomPasswordInput instanceof HTMLInputElement) {
   workspaceRoomPasswordInput.addEventListener("input", () => {
     selectedRoomPassword = normalizeRoomCode(workspaceRoomPasswordInput.value);
     updateRoomUi();
+  });
+}
+
+if (launchGate instanceof HTMLElement) {
+  launchGate.addEventListener("click", (event) => {
+    if (!hasEnteredBoard) return;
+    if (!launchGate.classList.contains("workspace-modal")) return;
+    if (event.target !== launchGate) return;
+    closeLaunchOverlay();
   });
 }
 
