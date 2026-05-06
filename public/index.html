@@ -51,7 +51,7 @@
             <button id="launchStartBtn" class="launch-menu-btn" type="button">START</button>
             <button id="launchJoinBtn" class="launch-menu-btn" type="button">JOIN ROOM</button>
           </div>
-          <p class="launch-press-start" aria-live="polite">PRESS START FOR RANDOM ROOM</p>
+          <p class="launch-press-start" aria-live="polite">PRESS START TO ENTER ROOM</p>
           <p class="launch-loading-label">LOADING PIXELS...</p>
           <div id="launchLoadingBar" class="launch-loading-bar" role="group" aria-label="Fill loading pixels"></div>
           <div class="launch-hourglass-wrap" aria-hidden="true">
@@ -109,6 +109,10 @@
                 <p id="zoomText">Zoom: 100%</p>
                 <p id="toolText">Tool: Brush</p>
                 <p id="statusText">Status: connecting...</p>
+                <p id="roomText">Room: -</p>
+                <div class="row">
+                  <button id="copyRoomCodeBtn" type="button">Copy Room Code</button>
+                </div>
                 <p id="playersText">Artists online: 0</p>
               </div>
               </div>
