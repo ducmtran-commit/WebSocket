@@ -1004,6 +1004,7 @@ input {
   transform-origin: top left;
   will-change: transform;
   position: relative;
+  touch-action: none;
   user-select: none;
   -webkit-user-drag: none;
   /* Keep board edge visible against viewport background while panning. */
@@ -1193,6 +1194,17 @@ input {
     width: calc(100vw - 14px);
     max-height: calc(100dvh - 16px);
     padding: 12px 12px;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .board-viewport,
+  .board,
+  .cell {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
