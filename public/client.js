@@ -997,10 +997,12 @@ let lastTwoFingerTapAt = 0;
 let lastThreeFingerTapAt = 0;
 let activeBoardTouchCount = 0;
 let blockTouchPaintUntil = 0;
-const TWO_FINGER_TAP_MAX_MS = 260;
+let lastPenUseAt = 0;
+let touchPanState = null;
+const TWO_FINGER_TAP_MAX_MS = 380;
 const TWO_FINGER_TAP_MAX_MOVE_PX = 36;
-const TWO_FINGER_DOUBLE_TAP_MS = 420;
-const THREE_FINGER_DOUBLE_TAP_MS = 420;
+const TWO_FINGER_DOUBLE_TAP_MS = 650;
+const THREE_FINGER_DOUBLE_TAP_MS = 650;
 
 function isMobileWorkspaceDockMode() {
   return window.matchMedia("(max-width: 700px)").matches;
@@ -1708,20 +1710,18 @@ function releasePaintCapture() {
   paintCapturePointerId = null;
 }
 
-function setPenDrawLock(active) {
-  if (!(boardViewport instanceof HTMLElement)) return;
-  boardViewport.classList.toggle("pen-draw-lock", Boolean(active));
-}
-
 function beginPainting(clientX, clientY, pointerId = null, pointerType = "mouse") {
   lastPaintGrid = null;
   isPainting = true;
   activePaintPointerId = typeof pointerId === "number" ? pointerId : null;
   activePaintPointerType = typeof pointerType === "string" ? pointerType : "mouse";
-  setPenDrawLock(activePaintPointerType === "pen");
   setToolboxDrawingHidden(true);
   paintAtClient(clientX, clientY);
   scheduleFlush();
+}
+
+function shouldUseFingerPanMode() {
+  return performance.now() - lastPenUseAt < 12000;
 }
 
 function continuePainting(clientX, clientY) {
@@ -1736,7 +1736,6 @@ function stopPainting() {
   activePaintPointerType = null;
   lastPaintGrid = null;
   releasePaintCapture();
-  setPenDrawLock(false);
   setToolboxDrawingHidden(false);
   flushPaintBatch();
   renderColorHistory();
@@ -1756,6 +1755,10 @@ board.addEventListener("pointerdown", (event) => {
   if (event.pointerType === "touch") {
     if (activeBoardTouchCount > 1) return;
     if (performance.now() < blockTouchPaintUntil) return;
+    if (shouldUseFingerPanMode()) return;
+  }
+  if (event.pointerType === "pen") {
+    lastPenUseAt = performance.now();
   }
   event.preventDefault();
   if (board.setPointerCapture) {
@@ -1980,6 +1983,66 @@ function flushWheelZoomFrame() {
 
 if (boardViewport instanceof HTMLElement) {
   boardViewport.addEventListener(
+    "touchstart",
+    (event) => {
+      const fingers = event.touches.length;
+      activeBoardTouchCount = fingers;
+      if (fingers === 1 && shouldUseFingerPanMode()) {
+        const t = event.touches[0];
+        touchPanState = {
+          x: t.clientX,
+          y: t.clientY,
+          left: boardViewport.scrollLeft,
+          top: boardViewport.scrollTop,
+        };
+        event.preventDefault();
+      } else {
+        touchPanState = null;
+      }
+      if (fingers !== 2 && fingers !== 3) {
+        multiFingerTapCandidate = null;
+        return;
+      }
+      blockTouchPaintUntil = performance.now() + 220;
+      stopPainting();
+      const a = event.touches[0];
+      const b = event.touches[1];
+      multiFingerTapCandidate = {
+        fingers,
+        at: performance.now(),
+        centerX: (a.clientX + b.clientX) / 2,
+        centerY: (a.clientY + b.clientY) / 2,
+      };
+    },
+    { passive: false }
+  );
+  boardViewport.addEventListener(
+    "touchmove",
+    (event) => {
+      activeBoardTouchCount = event.touches.length;
+      if (touchPanState && event.touches.length === 1) {
+        const t = event.touches[0];
+        const dx = t.clientX - touchPanState.x;
+        const dy = t.clientY - touchPanState.y;
+        boardViewport.scrollLeft = touchPanState.left - dx;
+        boardViewport.scrollTop = touchPanState.top - dy;
+        event.preventDefault();
+        return;
+      }
+      if (!multiFingerTapCandidate || event.touches.length !== multiFingerTapCandidate.fingers) return;
+      const a = event.touches[0];
+      const b = event.touches[1];
+      const cx = (a.clientX + b.clientX) / 2;
+      const cy = (a.clientY + b.clientY) / 2;
+      const dx = cx - multiFingerTapCandidate.centerX;
+      const dy = cy - multiFingerTapCandidate.centerY;
+      if (dx * dx + dy * dy > TWO_FINGER_TAP_MAX_MOVE_PX * TWO_FINGER_TAP_MAX_MOVE_PX) {
+        multiFingerTapCandidate = null;
+      }
+    },
+    { passive: false }
+  );
+  boardViewport.addEventListener(
     "wheel",
     (event) => {
       event.preventDefault();
@@ -2015,49 +2078,12 @@ if (boardViewport instanceof HTMLElement) {
     boardZoomAnchorClient = null;
   });
   boardViewport.addEventListener(
-    "touchstart",
-    (event) => {
-      const fingers = event.touches.length;
-      activeBoardTouchCount = fingers;
-      if (fingers !== 2 && fingers !== 3) {
-        multiFingerTapCandidate = null;
-        return;
-      }
-      // Briefly block touch paint so multi-finger gestures never leave accidental marks.
-      blockTouchPaintUntil = performance.now() + 220;
-      stopPainting();
-      const a = event.touches[0];
-      const b = event.touches[1];
-      multiFingerTapCandidate = {
-        fingers,
-        at: performance.now(),
-        centerX: (a.clientX + b.clientX) / 2,
-        centerY: (a.clientY + b.clientY) / 2,
-      };
-    },
-    { passive: true }
-  );
-  boardViewport.addEventListener(
-    "touchmove",
-    (event) => {
-      activeBoardTouchCount = event.touches.length;
-      if (!multiFingerTapCandidate || event.touches.length !== multiFingerTapCandidate.fingers) return;
-      const a = event.touches[0];
-      const b = event.touches[1];
-      const cx = (a.clientX + b.clientX) / 2;
-      const cy = (a.clientY + b.clientY) / 2;
-      const dx = cx - multiFingerTapCandidate.centerX;
-      const dy = cy - multiFingerTapCandidate.centerY;
-      if (dx * dx + dy * dy > TWO_FINGER_TAP_MAX_MOVE_PX * TWO_FINGER_TAP_MAX_MOVE_PX) {
-        multiFingerTapCandidate = null;
-      }
-    },
-    { passive: true }
-  );
-  boardViewport.addEventListener(
     "touchend",
     (event) => {
       activeBoardTouchCount = event.touches.length;
+      if (event.touches.length === 0) {
+        touchPanState = null;
+      }
       if (!multiFingerTapCandidate) return;
       if (event.touches.length > 0) return;
       const now = performance.now();
@@ -2093,6 +2119,7 @@ if (boardViewport instanceof HTMLElement) {
     "touchcancel",
     () => {
       activeBoardTouchCount = 0;
+      touchPanState = null;
       multiFingerTapCandidate = null;
       stopPainting();
     },
