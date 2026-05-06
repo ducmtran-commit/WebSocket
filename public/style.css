@@ -969,6 +969,20 @@ body {
   gap: 10px;
 }
 
+#launchRoomCodeRow {
+  display: none;
+}
+
+.launch-shell.join-mode #launchRoomCodeRow {
+  display: flex;
+}
+
+.launch-shell.join-mode #launchJoinBtn,
+.launch-shell:not(.join-mode) #launchStartBtn {
+  background: var(--retro-cyan);
+  color: #101726;
+}
+
 .launch-room-label {
   min-width: 70px;
   text-align: left;
