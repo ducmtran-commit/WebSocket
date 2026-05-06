@@ -704,6 +704,7 @@ body.app-gated.entering-canvas .layout {
 }
 
 #statusText,
+#roomText,
 #playersText {
   margin: 3px 0 0;
   font-size: 0.78rem;
@@ -1047,6 +1048,14 @@ body {
 
 .launch-room-item.is-selected {
   border-color: var(--retro-cyan);
+  box-shadow: 0 0 0 1px rgba(68, 247, 248, 0.35);
+}
+
+.launch-room-item:hover,
+.launch-room-item:focus-visible {
+  outline: none;
+  border-color: #7ddcff;
+  background: #16203a;
 }
 
 .launch-room-item.is-near-cap {
