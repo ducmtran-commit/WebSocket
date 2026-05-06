@@ -34,6 +34,11 @@ const launchRoomCodeInput = document.getElementById("launchRoomCodeInput");
 const launchRoomHint = document.getElementById("launchRoomHint");
 const launchRoomList = document.getElementById("launchRoomList");
 const copyRoomCodeBtn = document.getElementById("copyRoomCodeBtn");
+const workspaceRoomInput = document.getElementById("workspaceRoomInput");
+const workspaceRoomPasswordInput = document.getElementById("workspaceRoomPasswordInput");
+const workspaceJoinRoomBtn = document.getElementById("workspaceJoinRoomBtn");
+const workspaceCreateRoomBtn = document.getElementById("workspaceCreateRoomBtn");
+const workspaceLobbyBtn = document.getElementById("workspaceLobbyBtn");
 
 let ws;
 let reconnectAttempts = 0;
@@ -85,6 +90,7 @@ const SECTION_REORDER_SLOT_UNSET = Symbol("sectionReorderSlot");
 let sectionReorderInsertBefore = SECTION_REORDER_SLOT_UNSET;
 const COLOR_HISTORY_KEY = "pixel-board-color-history";
 const CLIENT_KEY_STORAGE = "pixel-board-client-key";
+const BOARD_SESSION_KEY = "pixel-board-last-session";
 const MAX_COLOR_HISTORY = 10;
 let maxRoomCount = 5;
 let maxUsersPerRoom = 30;
@@ -94,6 +100,7 @@ let selectedRoomPassword = "";
 let launchConnectMode = "start";
 let shouldReconnect = true;
 let roomPresencePollTimer = null;
+let manualRoomSwitchInProgress = false;
 let recentColors = [];
 
 /** Stable id for paint ownership across page refresh (server `ownerKey`). */
@@ -167,6 +174,7 @@ function updateRoomUi() {
     copyRoomCodeBtn.disabled = !selectedRoomPassword;
     copyRoomCodeBtn.textContent = selectedRoomPassword ? "Copy Room Password" : "Copy Room Password (Unavailable)";
   }
+  syncWorkspaceRoomControls();
 }
 
 function setLaunchConnectMode(nextMode, options = {}) {
@@ -203,6 +211,76 @@ function setLaunchConnectMode(nextMode, options = {}) {
 function normalizeRoomCode(value) {
   if (typeof value !== "string") return "";
   return value.trim().slice(0, 20);
+}
+
+function saveBoardSession() {
+  const payload = {
+    roomId: selectedRoomId,
+    roomPassword: selectedRoomPassword,
+    mode: launchConnectMode,
+    inBoard: hasEnteredBoard,
+    at: Date.now(),
+  };
+  try {
+    window.localStorage.setItem(BOARD_SESSION_KEY, JSON.stringify(payload));
+  } catch {
+    // Ignore localStorage errors.
+  }
+}
+
+function loadBoardSession() {
+  try {
+    const raw = window.localStorage.getItem(BOARD_SESSION_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || data.inBoard !== true) return null;
+    const roomId =
+      typeof data.roomId === "string" && data.roomId === PUBLIC_ROOM_ID
+        ? PUBLIC_ROOM_ID
+        : normalizeRoomId(data.roomId);
+    if (!roomId) return null;
+    return {
+      roomId,
+      roomPassword: normalizeRoomCode(data.roomPassword),
+      mode: data.mode === "create" ? "create" : data.mode === "join" ? "join" : "start",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function syncWorkspaceRoomControls() {
+  if (workspaceRoomInput instanceof HTMLInputElement) {
+    workspaceRoomInput.value = selectedRoomId || PUBLIC_ROOM_ID;
+  }
+  if (workspaceRoomPasswordInput instanceof HTMLInputElement) {
+    workspaceRoomPasswordInput.value = selectedRoomPassword || "";
+  }
+}
+
+function reconnectToCurrentRoom() {
+  if (!hasEnteredBoard) {
+    enterBoardExperience();
+    return;
+  }
+  const currentWs = ws;
+  manualRoomSwitchInProgress = true;
+  shouldReconnect = false;
+  const beginConnect = () => {
+    manualRoomSwitchInProgress = false;
+    shouldReconnect = true;
+    connect();
+  };
+  if (currentWs && (currentWs.readyState === WebSocket.OPEN || currentWs.readyState === WebSocket.CONNECTING)) {
+    try {
+      currentWs.close(1000, "switch-room");
+    } catch {
+      // Ignore close failures and reconnect anyway.
+    }
+    window.setTimeout(beginConnect, 90);
+    return;
+  }
+  beginConnect();
 }
 
 function renderRoomPresence(rooms = []) {
@@ -323,6 +401,7 @@ function setEnterOriginFromClick(sourceEvent) {
 function enterBoardExperience(sourceEvent = null) {
   if (hasEnteredBoard) return;
   hasEnteredBoard = true;
+  saveBoardSession();
   stopRoomPresencePolling();
   setEnterOriginFromClick(sourceEvent);
   playLaunchPixelSound();
@@ -1144,6 +1223,7 @@ function connect() {
       }
       updateRoomUi();
       setLaunchConnectMode(msg.isPublicRoom ? "start" : "join");
+      saveBoardSession();
       updateLaunchRoomHint(`Connected to ${displayRoomLabel(selectedRoomId)}.`, false);
       renderState(msg);
       if (pendingPixels.size > 0) {
@@ -1189,6 +1269,7 @@ function connect() {
   });
 
   ws.addEventListener("close", (event) => {
+    if (manualRoomSwitchInProgress) return;
     if (
       event.code === 4003 ||
       event.code === 4004 ||
@@ -1696,6 +1777,70 @@ if (copyRoomCodeBtn instanceof HTMLButtonElement) {
     } catch {
       updateLaunchRoomHint("Could not copy automatically. Please copy manually.", true);
     }
+  });
+}
+
+function switchRoomFromWorkspace(targetMode) {
+  const mode = targetMode === "create" ? "create" : targetMode === "join" ? "join" : "start";
+  if (mode === "start") {
+    setSelectedRoom(PUBLIC_ROOM_ID);
+    selectedRoomPassword = "";
+    setLaunchConnectMode("start");
+    updateLaunchRoomHint("Switching to LOBBY...", false);
+    saveBoardSession();
+    reconnectToCurrentRoom();
+    return;
+  }
+
+  const roomRaw = workspaceRoomInput instanceof HTMLInputElement ? workspaceRoomInput.value : "";
+  const roomId = normalizeRoomId(roomRaw);
+  if (!roomId || roomId === PUBLIC_ROOM_ID) {
+    updateLaunchRoomHint("Use a custom room name (not LOBBY).", true);
+    return;
+  }
+  const roomPassword = normalizeRoomCode(
+    workspaceRoomPasswordInput instanceof HTMLInputElement ? workspaceRoomPasswordInput.value : ""
+  );
+  if (!roomPassword) {
+    updateLaunchRoomHint("Password is required.", true);
+    return;
+  }
+  if (mode === "create" && roomPassword.length < 4) {
+    updateLaunchRoomHint("Password must be at least 4 characters.", true);
+    return;
+  }
+  setSelectedRoom(roomId);
+  selectedRoomPassword = roomPassword;
+  setLaunchConnectMode(mode);
+  updateLaunchRoomHint(
+    mode === "create" ? `Creating ${displayRoomLabel(roomId)}...` : `Joining ${displayRoomLabel(roomId)}...`,
+    false
+  );
+  saveBoardSession();
+  reconnectToCurrentRoom();
+}
+
+if (workspaceJoinRoomBtn instanceof HTMLButtonElement) {
+  workspaceJoinRoomBtn.addEventListener("click", () => {
+    switchRoomFromWorkspace("join");
+  });
+}
+
+if (workspaceCreateRoomBtn instanceof HTMLButtonElement) {
+  workspaceCreateRoomBtn.addEventListener("click", () => {
+    switchRoomFromWorkspace("create");
+  });
+}
+
+if (workspaceLobbyBtn instanceof HTMLButtonElement) {
+  workspaceLobbyBtn.addEventListener("click", () => {
+    switchRoomFromWorkspace("start");
+  });
+}
+
+if (workspaceRoomInput instanceof HTMLInputElement) {
+  workspaceRoomInput.addEventListener("input", () => {
+    workspaceRoomInput.value = workspaceRoomInput.value.toLowerCase();
   });
 }
 
