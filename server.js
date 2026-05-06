@@ -94,6 +94,7 @@ function createRoomState(roomId, options = {}) {
     chat: [],
     lastActivityAt: Date.now(),
     boardDirty: false,
+    saveInFlight: false,
     saveDebounceTimer: null,
     idleWipeTimer: null,
     paintBroadcastMerge: new Map(),
@@ -166,23 +167,53 @@ function scheduleIdleWipeIfEmpty(roomId) {
   }, IDLE_WIPE_MS);
 }
 
-function flushRoomSave(roomId) {
+function roomSavePayload(room) {
+  return JSON.stringify({
+    version: 1,
+    roomId: room.id,
+    isPublic: room.isPublic === true,
+    roomPassword: room.password || "",
+    lastActivityAt: room.lastActivityAt,
+    pixels: room.pixels,
+    chat: room.chat,
+  });
+}
+
+async function flushRoomSave(roomId) {
   const room = rooms.get(roomId);
   if (!room) return;
   room.saveDebounceTimer = null;
   if (!room.boardDirty) return;
+  if (room.saveInFlight) return;
+  room.boardDirty = false;
+  room.saveInFlight = true;
+  try {
+    await fs.promises.mkdir(ROOMS_DIR, { recursive: true });
+    const payload = roomSavePayload(room);
+    const file = roomFile(roomId);
+    const tmp = `${file}.tmp`;
+    await fs.promises.writeFile(tmp, payload, "utf8");
+    await fs.promises.rename(tmp, file);
+  } catch (err) {
+    console.warn(`${formatRoomLabel(roomId)} save failed:`, err.message);
+    room.boardDirty = true;
+  } finally {
+    room.saveInFlight = false;
+    if (room.boardDirty && room.saveDebounceTimer == null) {
+      room.saveDebounceTimer = setTimeout(() => {
+        void flushRoomSave(room.id);
+      }, Math.min(1200, SAVE_DEBOUNCE_MS));
+    }
+  }
+}
+
+function flushRoomSaveSync(roomId) {
+  const room = rooms.get(roomId);
+  if (!room || !room.boardDirty) return;
   room.boardDirty = false;
   try {
     fs.mkdirSync(ROOMS_DIR, { recursive: true });
-    const payload = JSON.stringify({
-      version: 1,
-      roomId: room.id,
-      isPublic: room.isPublic === true,
-      roomPassword: room.password || "",
-      lastActivityAt: room.lastActivityAt,
-      pixels: room.pixels,
-      chat: room.chat,
-    });
+    const payload = roomSavePayload(room);
     const file = roomFile(roomId);
     const tmp = `${file}.tmp`;
     fs.writeFileSync(tmp, payload, "utf8");
@@ -198,7 +229,7 @@ function touchRoomActivity(room) {
   room.boardDirty = true;
   if (room.saveDebounceTimer) clearTimeout(room.saveDebounceTimer);
   room.saveDebounceTimer = setTimeout(() => {
-    flushRoomSave(room.id);
+    void flushRoomSave(room.id);
   }, SAVE_DEBOUNCE_MS);
 }
 
@@ -269,7 +300,7 @@ ensureRoom(PUBLIC_ROOM_ID, { isPublic: true });
 setInterval(() => {
   for (const room of rooms.values()) {
     if (room.boardDirty && room.saveDebounceTimer == null) {
-      flushRoomSave(room.id);
+      void flushRoomSave(room.id);
     }
   }
 }, 60000);
@@ -286,7 +317,7 @@ function shutdownPersist() {
       room.paintBroadcastTimer = null;
     }
     if (room.boardDirty) {
-      flushRoomSave(room.id);
+      flushRoomSaveSync(room.id);
     }
   }
 }
