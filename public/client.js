@@ -864,11 +864,11 @@ function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
     ? clamp(anchorClientY, innerTop, Math.max(innerTop, innerBottom - 1e-6))
     : innerTop + viewH / 2;
 
-  const pivotRelX = pivotX - innerLeft;
-  const pivotRelY = pivotY - innerTop;
-  // Board-local coords from scroll-space (stable; avoids getBoundingClientRect vs scroll mismatch).
-  const lx = (boardViewport.scrollLeft + pivotRelX) / prevZoom;
-  const ly = (boardViewport.scrollTop + pivotRelY) / prevZoom;
+  const beforeRect = board.getBoundingClientRect();
+  const beforeW = Math.max(1e-6, beforeRect.width);
+  const beforeH = Math.max(1e-6, beforeRect.height);
+  const u = (pivotX - beforeRect.left) / beforeW;
+  const v = (pivotY - beforeRect.top) / beforeH;
 
   zoomLevel = clamped;
   zoomInput.value = String(clamped);
@@ -877,10 +877,14 @@ function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
   board.style.transform = `scale(${zoomLevel})`;
 
   void board.offsetWidth;
+  const afterRect = board.getBoundingClientRect();
+  const targetX = afterRect.left + u * afterRect.width;
+  const targetY = afterRect.top + v * afterRect.height;
+  const deltaX = targetX - pivotX;
+  const deltaY = targetY - pivotY;
 
-  const nextScrollLeft = lx * clamped - pivotRelX;
-  const nextScrollTop = ly * clamped - pivotRelY;
-
+  const nextScrollLeft = boardViewport.scrollLeft + deltaX;
+  const nextScrollTop = boardViewport.scrollTop + deltaY;
   const maxLeft = Math.max(0, boardViewport.scrollWidth - boardViewport.clientWidth);
   const maxTop = Math.max(0, boardViewport.scrollHeight - boardViewport.clientHeight);
   boardViewport.scrollLeft = clamp(nextScrollLeft, 0, maxLeft);
@@ -2004,10 +2008,23 @@ function touchDistance(a, b) {
   return Math.hypot(dx, dy);
 }
 
+function touchesContainStylus(touches) {
+  if (!touches) return false;
+  for (const t of touches) {
+    if (t && typeof t.touchType === "string" && t.touchType.toLowerCase() === "stylus") {
+      return true;
+    }
+  }
+  return false;
+}
+
 if (boardViewport instanceof HTMLElement) {
   boardViewport.addEventListener(
     "touchstart",
     (event) => {
+      if (touchesContainStylus(event.touches)) {
+        return;
+      }
       const fingers = event.touches.length;
       activeBoardTouchCount = fingers;
       touchPinchState = null;
@@ -2029,6 +2046,7 @@ if (boardViewport instanceof HTMLElement) {
         touchPinchState = {
           startDistance: Math.max(1, touchDistance(a, b)),
           startZoom: zoomLevel,
+          moved: false,
         };
       }
       if (fingers !== 2 && fingers !== 3) {
@@ -2051,6 +2069,9 @@ if (boardViewport instanceof HTMLElement) {
   boardViewport.addEventListener(
     "touchmove",
     (event) => {
+      if (touchesContainStylus(event.touches)) {
+        return;
+      }
       activeBoardTouchCount = event.touches.length;
       if (touchPanState && event.touches.length === 1) {
         const t = event.touches[0];
@@ -2066,12 +2087,19 @@ if (boardViewport instanceof HTMLElement) {
         const b = event.touches[1];
         const nextDistance = Math.max(1, touchDistance(a, b));
         const ratio = nextDistance / touchPinchState.startDistance;
+        if (Math.abs(ratio - 1) > 0.02) {
+          touchPinchState.moved = true;
+        }
         const centerX = (a.clientX + b.clientX) / 2;
         const centerY = (a.clientY + b.clientY) / 2;
         setZoom(touchPinchState.startZoom * ratio, centerX, centerY);
         event.preventDefault();
       }
       if (!multiFingerTapCandidate || event.touches.length !== multiFingerTapCandidate.fingers) return;
+      if (touchPinchState?.moved && multiFingerTapCandidate.fingers === 2) {
+        multiFingerTapCandidate = null;
+        return;
+      }
       const a = event.touches[0];
       const b = event.touches[1];
       const cx = (a.clientX + b.clientX) / 2;
@@ -2122,6 +2150,9 @@ if (boardViewport instanceof HTMLElement) {
   boardViewport.addEventListener(
     "touchend",
     (event) => {
+      if (touchesContainStylus(event.changedTouches)) {
+        return;
+      }
       activeBoardTouchCount = event.touches.length;
       if (event.touches.length <= 1) {
         touchPinchState = null;
