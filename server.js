@@ -333,9 +333,66 @@ process.on("SIGTERM", () => {
   process.exit(0);
 });
 
-function randomColor() {
-  const palette = ["#f97316", "#0ea5e9", "#22c55e", "#a855f7", "#ef4444", "#14b8a6", "#eab308"];
-  return palette[Math.floor(Math.random() * palette.length)];
+const USER_COLOR_PALETTE = ["#f97316", "#0ea5e9", "#22c55e", "#a855f7", "#ef4444", "#14b8a6", "#eab308", "#f43f5e", "#06b6d4", "#84cc16"];
+
+function hashString(text) {
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function hslToHex(h, s, l) {
+  const hh = ((h % 360) + 360) % 360;
+  const ss = Math.max(0, Math.min(100, s)) / 100;
+  const ll = Math.max(0, Math.min(100, l)) / 100;
+  const c = (1 - Math.abs(2 * ll - 1)) * ss;
+  const x = c * (1 - Math.abs(((hh / 60) % 2) - 1));
+  const m = ll - c / 2;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (hh < 60) {
+    r = c;
+    g = x;
+  } else if (hh < 120) {
+    r = x;
+    g = c;
+  } else if (hh < 180) {
+    g = c;
+    b = x;
+  } else if (hh < 240) {
+    g = x;
+    b = c;
+  } else if (hh < 300) {
+    r = x;
+    b = c;
+  } else {
+    r = c;
+    b = x;
+  }
+  const toHex = (n) => Math.round((n + m) * 255).toString(16).padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function nextUserColor(room, seedText = "") {
+  const used = new Set(
+    Array.from(room.users.values())
+      .map((u) => String(u.color || "").toLowerCase())
+      .filter((c) => /^#[0-9a-f]{6}$/.test(c))
+  );
+  for (const color of USER_COLOR_PALETTE) {
+    if (!used.has(color)) return color;
+  }
+  const seed = hashString(`${room.id}:${seedText}:${Date.now()}:${Math.random()}`);
+  for (let i = 0; i < 30; i += 1) {
+    const hue = (seed + i * 31) % 360;
+    const color = hslToHex(hue, 78, 58).toLowerCase();
+    if (!used.has(color)) return color;
+  }
+  return hslToHex(seed % 360, 70, 55).toLowerCase();
 }
 
 function safeName(value) {
@@ -368,6 +425,7 @@ function sendInitState(ws, room) {
       roomId: room.id,
       roomPassword: room.password || "",
       isPublicRoom: room.isPublic === true,
+      selfUserId: ws.userId,
       gridWidth: GRID_WIDTH,
       gridHeight: GRID_HEIGHT,
       pixels: room.pixels,
@@ -399,6 +457,27 @@ function broadcastPixelsUpdated(roomId, pixels) {
   broadcastToRoom(roomId, {
     type: "pixels-updated",
     pixels,
+  });
+}
+
+function broadcastDrawingActivity(roomId, user, point) {
+  if (!user || !point) return;
+  const x = Number(point.x);
+  const y = Number(point.y);
+  if (!Number.isInteger(x) || !Number.isInteger(y)) return;
+  broadcastToRoom(roomId, {
+    type: "drawing-activity",
+    user: {
+      id: user.id,
+      name: user.name,
+      color: user.color,
+    },
+    point: {
+      x,
+      y,
+      color: typeof point.color === "string" ? point.color : user.color,
+    },
+    at: Date.now(),
   });
 }
 
@@ -567,7 +646,7 @@ wss.on("connection", (ws, req) => {
   const user = {
     id: userId,
     name: "Artist",
-    color: randomColor(),
+    color: nextUserColor(room, userId),
   };
 
   room.users.set(userId, user);
@@ -633,6 +712,11 @@ wss.on("connection", (ws, req) => {
       }
       if (changes.length > 0) {
         mergePaintBroadcastPixels(currentRoom, updates);
+        const now = Date.now();
+        if (!ws.lastDrawingActivityBroadcastAt || now - ws.lastDrawingActivityBroadcastAt > 320) {
+          ws.lastDrawingActivityBroadcastAt = now;
+          broadcastDrawingActivity(currentRoom.id, current, updates[updates.length - 1]);
+        }
         ws.undoStack.push({ changes });
         if (ws.undoStack.length > 80) ws.undoStack.shift();
         ws.redoStack = [];
