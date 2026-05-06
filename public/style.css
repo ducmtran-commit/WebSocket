@@ -101,6 +101,19 @@ body.app-gated.entering-canvas .layout {
   display: none;
 }
 
+.launch-gate.workspace-modal {
+  background: rgba(3, 5, 9, 0.68);
+  backdrop-filter: blur(2px);
+}
+
+.launch-gate.workspace-modal::before {
+  opacity: 0.5;
+}
+
+.launch-gate.workspace-modal::after {
+  opacity: 0.2;
+}
+
 .launch-center {
   position: relative;
   z-index: 1;
