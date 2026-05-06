@@ -28,6 +28,7 @@ const launchGate = document.getElementById("launchGate");
 const launchShell = document.getElementById("launchShell");
 const launchStartBtn = document.getElementById("launchStartBtn");
 const launchJoinBtn = document.getElementById("launchJoinBtn");
+const launchCreateBtn = document.getElementById("launchCreateBtn");
 const launchRoomInput = document.getElementById("launchRoomInput");
 const launchRoomCodeInput = document.getElementById("launchRoomCodeInput");
 const launchRoomHint = document.getElementById("launchRoomHint");
@@ -86,8 +87,9 @@ const CLIENT_KEY_STORAGE = "pixel-board-client-key";
 const MAX_COLOR_HISTORY = 10;
 let maxRoomCount = 5;
 let maxUsersPerRoom = 30;
-let selectedRoomId = "room-1";
-let selectedRoomCode = "";
+const PUBLIC_ROOM_ID = "lobby";
+let selectedRoomId = PUBLIC_ROOM_ID;
+let selectedRoomPassword = "";
 let launchConnectMode = "start";
 let shouldReconnect = true;
 let roomPresencePollTimer = null;
@@ -109,7 +111,7 @@ function getOrCreateClientKey() {
   }
 }
 
-function wsUrl(roomId = selectedRoomId, mode = launchConnectMode, roomCode = selectedRoomCode) {
+function wsUrl(roomId = selectedRoomId, mode = launchConnectMode, roomPassword = selectedRoomPassword) {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   const url = new URL(`${protocol}//${window.location.host}`);
   if (typeof roomId === "string" && roomId) {
@@ -118,27 +120,27 @@ function wsUrl(roomId = selectedRoomId, mode = launchConnectMode, roomCode = sel
   if (typeof mode === "string" && mode) {
     url.searchParams.set("mode", mode);
   }
-  if (typeof roomCode === "string" && roomCode) {
-    url.searchParams.set("code", roomCode);
+  if (typeof roomPassword === "string" && roomPassword) {
+    url.searchParams.set("password", roomPassword);
   }
   return url.toString();
 }
 
 function normalizeRoomId(value) {
   if (typeof value !== "string") return null;
-  const cleaned = value.trim().toLowerCase();
+  const cleaned = value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9_-]/g, "");
   if (!cleaned) return null;
-  const roomMatch = cleaned.match(/^room-(\d{1,2})$/);
-  const digitMatch = cleaned.match(/^(\d{1,2})$/);
-  const n = Number(roomMatch?.[1] || digitMatch?.[1]);
-  if (!Number.isInteger(n) || n < 1 || n > maxRoomCount) return null;
-  return `room-${n}`;
+  if (!/^[a-z0-9][a-z0-9_-]{1,19}$/.test(cleaned)) return null;
+  return cleaned;
 }
 
 function displayRoomLabel(roomId) {
-  const match = String(roomId || "").match(/^room-(\d{1,2})$/i);
-  if (!match) return "ROOM-1";
-  return `ROOM-${match[1]}`;
+  if (typeof roomId !== "string" || !roomId) return "LOBBY";
+  return roomId.replace(/-/g, " ").toUpperCase();
 }
 
 function updateLaunchRoomHint(message, isError = false) {
@@ -161,29 +163,34 @@ function updateRoomUi() {
     roomText.textContent = `Room: ${label}`;
   }
   if (copyRoomCodeBtn instanceof HTMLButtonElement) {
-    copyRoomCodeBtn.disabled = !selectedRoomCode;
-    copyRoomCodeBtn.textContent = selectedRoomCode ? "Copy Room Code" : "Copy Room Code (Unavailable)";
+    copyRoomCodeBtn.disabled = !selectedRoomPassword;
+    copyRoomCodeBtn.textContent = selectedRoomPassword ? "Copy Room Password" : "Copy Room Password (Unavailable)";
   }
 }
 
 function setLaunchConnectMode(nextMode, options = {}) {
-  const joinMode = nextMode === "join";
-  launchConnectMode = joinMode ? "join" : "start";
+  const mode = nextMode === "create" ? "create" : nextMode === "join" ? "join" : "start";
+  launchConnectMode = mode;
+  const needsPassword = mode === "join" || mode === "create";
   if (launchShell instanceof HTMLElement) {
-    launchShell.classList.toggle("join-mode", joinMode);
+    launchShell.classList.toggle("join-mode", needsPassword);
+    launchShell.classList.toggle("create-mode", mode === "create");
   }
   if (launchStartBtn instanceof HTMLButtonElement) {
-    launchStartBtn.setAttribute("aria-pressed", String(!joinMode));
+    launchStartBtn.setAttribute("aria-pressed", String(mode === "start"));
   }
   if (launchJoinBtn instanceof HTMLButtonElement) {
-    launchJoinBtn.setAttribute("aria-pressed", String(joinMode));
+    launchJoinBtn.setAttribute("aria-pressed", String(mode === "join"));
+  }
+  if (launchCreateBtn instanceof HTMLButtonElement) {
+    launchCreateBtn.setAttribute("aria-pressed", String(mode === "create"));
   }
   if (launchRoomCodeInput instanceof HTMLInputElement) {
-    launchRoomCodeInput.disabled = !joinMode;
-    launchRoomCodeInput.required = joinMode;
-    if (!joinMode) {
+    launchRoomCodeInput.disabled = !needsPassword;
+    launchRoomCodeInput.required = needsPassword;
+    if (!needsPassword) {
       launchRoomCodeInput.value = "";
-      selectedRoomCode = "";
+      selectedRoomPassword = "";
     } else if (options.focusCode) {
       launchRoomCodeInput.focus({ preventScroll: true });
       launchRoomCodeInput.select();
@@ -209,16 +216,27 @@ function renderRoomPresence(rooms = []) {
     const label = typeof room?.label === "string" ? room.label : displayRoomLabel(roomId);
     const users = Number.isInteger(room?.users) ? room.users : 0;
     const cap = Number.isInteger(room?.capacity) ? room.capacity : maxUsersPerRoom;
+    const isPublic = Boolean(room?.isPublic);
+    const isLocked = Boolean(room?.isLocked);
     const item = document.createElement("button");
     item.type = "button";
     item.className = "launch-room-item";
     if (roomId === selectedRoomId) item.classList.add("is-selected");
     if (cap > 0 && users >= Math.max(1, Math.floor(cap * 0.8))) item.classList.add("is-near-cap");
-    item.innerHTML = `<span class="launch-room-item-label">${label}</span><span class="launch-room-item-count">${users}/${cap}</span>`;
+    const accessText = isPublic ? "OPEN" : isLocked ? "LOCKED" : "PRIVATE";
+    item.innerHTML =
+      `<span class="launch-room-item-label">${label} (${accessText})</span>` +
+      `<span class="launch-room-item-count">${users}/${cap}</span>`;
     item.addEventListener("click", () => {
       if (!roomId) return;
       setSelectedRoom(roomId);
-      updateLaunchRoomHint(`Ready for ${displayRoomLabel(roomId)}.`, false);
+      if (isPublic || roomId === PUBLIC_ROOM_ID) {
+        setLaunchConnectMode("start");
+        updateLaunchRoomHint(`Ready to start in ${displayRoomLabel(roomId)}.`, false);
+      } else {
+        setLaunchConnectMode("join", { focusCode: true });
+        updateLaunchRoomHint(`Enter password to join ${displayRoomLabel(roomId)}.`, false);
+      }
     });
     launchRoomList.appendChild(item);
   });
@@ -1069,7 +1087,7 @@ function connect() {
   releasePaintCapture();
 
   statusText.textContent = "Status: connecting...";
-  ws = new WebSocket(wsUrl(selectedRoomId, launchConnectMode, selectedRoomCode));
+  ws = new WebSocket(wsUrl(selectedRoomId, launchConnectMode, selectedRoomPassword));
 
   ws.addEventListener("open", () => {
     reconnectAttempts = 0;
@@ -1096,11 +1114,11 @@ function connect() {
       if (typeof msg.roomId === "string") {
         setSelectedRoom(msg.roomId);
       }
-      if (typeof msg.roomJoinCode === "string") {
-        selectedRoomCode = normalizeRoomCode(msg.roomJoinCode);
+      if (typeof msg.roomPassword === "string") {
+        selectedRoomPassword = normalizeRoomCode(msg.roomPassword);
       }
       updateRoomUi();
-      setLaunchConnectMode("join");
+      setLaunchConnectMode(msg.isPublicRoom ? "start" : "join");
       updateLaunchRoomHint(`Connected to ${displayRoomLabel(selectedRoomId)}.`, false);
       renderState(msg);
       if (pendingPixels.size > 0) {
@@ -1146,7 +1164,14 @@ function connect() {
   });
 
   ws.addEventListener("close", (event) => {
-    if (event.code === 4003 || event.code === 4004 || event.code === 4005) {
+    if (
+      event.code === 4003 ||
+      event.code === 4004 ||
+      event.code === 4005 ||
+      event.code === 4006 ||
+      event.code === 4007 ||
+      event.code === 4008
+    ) {
       const reason = event.reason || "Room unavailable.";
       updateLaunchRoomHint(reason, true);
       statusText.textContent = `Status: ${reason}`;
@@ -1519,11 +1544,11 @@ syncWorkspaceCollapseButton();
 loadColorHistory();
 addColorToHistory(colorInput.value);
 if (statusText instanceof HTMLElement) {
-  statusText.textContent = "Status: select room and press start";
+  statusText.textContent = "Status: start joins public lobby";
 }
 setLaunchConnectMode("start");
-updateLaunchRoomHint(`Up to ${maxRoomCount} rooms, ${maxUsersPerRoom} users each.`, false);
-setSelectedRoom("room-1");
+updateLaunchRoomHint(`Up to ${maxRoomCount} rooms total, ${maxUsersPerRoom} users each.`, false);
+setSelectedRoom(PUBLIC_ROOM_ID);
 updateRoomUi();
 startRoomPresencePolling();
 
@@ -1531,15 +1556,10 @@ if (launchStartBtn instanceof HTMLButtonElement) {
   launchStartBtn.addEventListener("click", (event) => {
     if (hasEnteredBoard) return;
     setLaunchConnectMode("start");
-    const requested = normalizeRoomId(launchRoomInput instanceof HTMLInputElement ? launchRoomInput.value : "");
-    if (!requested) {
-      updateLaunchRoomHint(`Enter ROOM-1 to ROOM-${maxRoomCount}.`, true);
-      return;
-    }
-    setSelectedRoom(requested);
-    selectedRoomCode = "";
+    setSelectedRoom(PUBLIC_ROOM_ID);
+    selectedRoomPassword = "";
     updateRoomUi();
-    updateLaunchRoomHint(`Starting ${displayRoomLabel(requested)}...`, false);
+    updateLaunchRoomHint("Joining LOBBY...", false);
     void refreshRoomPresence();
     enterBoardExperience(event);
   });
@@ -1551,53 +1571,79 @@ if (launchJoinBtn instanceof HTMLButtonElement) {
     setLaunchConnectMode("join", { focusCode: true });
     const requested = normalizeRoomId(launchRoomInput instanceof HTMLInputElement ? launchRoomInput.value : "");
     if (!requested) {
-      updateLaunchRoomHint(`Enter ROOM-1 to ROOM-${maxRoomCount} to join.`, true);
+      updateLaunchRoomHint("Enter room name (letters, numbers, - or _).", true);
       return;
     }
-    const code = normalizeRoomCode(launchRoomCodeInput instanceof HTMLInputElement ? launchRoomCodeInput.value : "");
-    if (!code) {
-      updateLaunchRoomHint("Join code required for private room access.", true);
+    const password = normalizeRoomCode(
+      launchRoomCodeInput instanceof HTMLInputElement ? launchRoomCodeInput.value : ""
+    );
+    if (!password) {
+      updateLaunchRoomHint("Room password required.", true);
       return;
     }
     setSelectedRoom(requested);
-    selectedRoomCode = code;
+    selectedRoomPassword = password;
     updateRoomUi();
-    updateLaunchRoomHint(`Joining ${displayRoomLabel(requested)} with code...`, false);
+    updateLaunchRoomHint(`Joining ${displayRoomLabel(requested)}...`, false);
+    enterBoardExperience(event);
+  });
+}
+
+if (launchCreateBtn instanceof HTMLButtonElement) {
+  launchCreateBtn.addEventListener("click", (event) => {
+    if (hasEnteredBoard) return;
+    setLaunchConnectMode("create", { focusCode: true });
+    const requested = normalizeRoomId(launchRoomInput instanceof HTMLInputElement ? launchRoomInput.value : "");
+    if (!requested || requested === PUBLIC_ROOM_ID) {
+      updateLaunchRoomHint("Choose a custom room name (not LOBBY).", true);
+      return;
+    }
+    const password = normalizeRoomCode(
+      launchRoomCodeInput instanceof HTMLInputElement ? launchRoomCodeInput.value : ""
+    );
+    if (password.length < 4) {
+      updateLaunchRoomHint("Password must be at least 4 characters.", true);
+      return;
+    }
+    setSelectedRoom(requested);
+    selectedRoomPassword = password;
+    updateRoomUi();
+    updateLaunchRoomHint(`Creating ${displayRoomLabel(requested)}...`, false);
+    void refreshRoomPresence();
     enterBoardExperience(event);
   });
 }
 
 if (launchRoomInput instanceof HTMLInputElement) {
   launchRoomInput.addEventListener("input", () => {
-    launchRoomInput.value = launchRoomInput.value.toUpperCase();
+    launchRoomInput.value = launchRoomInput.value.toLowerCase();
     const next = normalizeRoomId(launchRoomInput.value);
     if (next) {
       setSelectedRoom(next);
       updateLaunchRoomHint(`Ready for ${displayRoomLabel(next)}.`, false);
       void refreshRoomPresence();
     } else {
-      updateLaunchRoomHint(`Enter ROOM-1 to ROOM-${maxRoomCount}.`, true);
+      updateLaunchRoomHint("Use 2-20 chars: a-z, 0-9, - or _.", true);
     }
   });
 }
 
 if (launchRoomCodeInput instanceof HTMLInputElement) {
   launchRoomCodeInput.addEventListener("input", () => {
-    launchRoomCodeInput.value = launchRoomCodeInput.value.toUpperCase();
-    selectedRoomCode = normalizeRoomCode(launchRoomCodeInput.value);
+    selectedRoomPassword = normalizeRoomCode(launchRoomCodeInput.value);
     updateRoomUi();
   });
 }
 
 if (copyRoomCodeBtn instanceof HTMLButtonElement) {
   copyRoomCodeBtn.addEventListener("click", async () => {
-    if (!selectedRoomCode) {
-      updateLaunchRoomHint("Room code unavailable yet. Connect first.", true);
+    if (!selectedRoomPassword) {
+      updateLaunchRoomHint("Room password unavailable yet. Connect first.", true);
       return;
     }
     try {
-      await navigator.clipboard.writeText(selectedRoomCode);
-      copyRoomCodeBtn.textContent = "Code Copied!";
+      await navigator.clipboard.writeText(selectedRoomPassword);
+      copyRoomCodeBtn.textContent = "Password Copied!";
       window.setTimeout(() => {
         updateRoomUi();
       }, 1200);
