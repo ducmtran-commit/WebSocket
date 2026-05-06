@@ -1039,6 +1039,11 @@ input {
   user-select: none;
 }
 
+.board-viewport.pen-draw-lock {
+  overflow: hidden;
+  touch-action: none;
+}
+
 .drawing-tag-layer {
   position: absolute;
   inset: 0;
