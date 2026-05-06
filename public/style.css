@@ -429,7 +429,7 @@ body.app-gated.entering-canvas .layout {
 .workspace-panel {
   top: 12px;
   left: 12px;
-  width: min(380px, calc(100vw - 24px));
+  width: min(430px, calc(100vw - 24px));
   max-height: calc(100vh - 24px);
   padding: 8px;
   display: flex;
@@ -878,7 +878,7 @@ input {
 
 @media (max-width: 920px) {
   .workspace-panel {
-    width: min(340px, calc(100vw - 20px));
+    width: min(380px, calc(100vw - 20px));
     top: 10px;
     left: 10px;
     max-height: calc(100vh - 20px);
