@@ -69,8 +69,8 @@ const BOARD_PADDING_PX = 8;
 const BOARD_GRID_GAP_PX = 1;
 const CELL_STRIDE_PX = BASE_PIXEL_SIZE + BOARD_GRID_GAP_PX;
 const MIN_ZOOM = 0.7;
-const DESKTOP_MAX_ZOOM = 1.8;
-const MOBILE_MAX_ZOOM = 1.6;
+const DESKTOP_MAX_ZOOM = 2.2;
+const MOBILE_MAX_ZOOM = 2.2;
 let zoomLevel = 1;
 /** Last pointer position over the board viewport (for zoom +/- / slider to zoom toward cursor). */
 let boardZoomAnchorClient = null;
@@ -1781,15 +1781,6 @@ board.addEventListener("pointermove", (event) => {
   }
   if (activePaintPointerId != null && event.pointerId !== activePaintPointerId) return;
   event.preventDefault();
-  if (event.pointerType === "pen" && typeof event.getCoalescedEvents === "function") {
-    const coalesced = event.getCoalescedEvents();
-    if (Array.isArray(coalesced) && coalesced.length > 0) {
-      for (const pe of coalesced) {
-        continuePainting(pe.clientX, pe.clientY);
-      }
-      return;
-    }
-  }
   continuePainting(event.clientX, event.clientY);
 });
 
