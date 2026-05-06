@@ -16,25 +16,29 @@ const IDLE_WIPE_MS = Math.max(1, Number(process.env.BOARD_IDLE_WIPE_MINUTES || 4
 const SAVE_DEBOUNCE_MS = Math.max(3000, Number(process.env.BOARD_SAVE_DEBOUNCE_MS || 12000));
 const MAX_ROOMS = Math.max(1, Number(process.env.MAX_ROOMS || 5));
 const MAX_USERS_PER_ROOM = Math.max(1, Number(process.env.MAX_USERS_PER_ROOM || 30));
-const ROOM_JOIN_CODES_ENV = String(process.env.ROOM_JOIN_CODES || "").trim();
+const PUBLIC_ROOM_ID = "lobby";
 
 const GRID_WIDTH = 256;
 const GRID_HEIGHT = 192;
 const DEFAULT_PIXEL = "#0b1220";
-const ROOM_IDS = Array.from({ length: MAX_ROOMS }, (_unused, i) => `room-${i + 1}`);
 
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/health", (_req, res) => res.status(200).send("ok"));
 app.get("/api/rooms", (_req, res) => {
-  const payload = ROOM_IDS.map((roomId) => ({
-    id: roomId,
-    label: formatRoomLabel(roomId),
-    users: countOpenClientsInRoom(roomId),
-    capacity: MAX_USERS_PER_ROOM,
-  }));
+  const payload = Array.from(rooms.values())
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((room) => ({
+      id: room.id,
+      label: formatRoomLabel(room.id),
+      users: countOpenClientsInRoom(room.id),
+      capacity: MAX_USERS_PER_ROOM,
+      isPublic: room.isPublic === true,
+      isLocked: Boolean(room.password),
+    }));
   res.json({
     maxRooms: MAX_ROOMS,
     maxUsersPerRoom: MAX_USERS_PER_ROOM,
+    usedRooms: rooms.size,
     rooms: payload,
   });
 });
@@ -54,56 +58,20 @@ function roomFile(roomId) {
 }
 
 function formatRoomLabel(roomId) {
-  const n = Number(String(roomId).split("-")[1]);
-  return Number.isInteger(n) ? `ROOM-${n}` : roomId.toUpperCase();
+  if (roomId === PUBLIC_ROOM_ID) return "LOBBY";
+  return String(roomId || "").replace(/-/g, " ").toUpperCase();
 }
 
-function generateRandomJoinCode() {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let out = "";
-  for (let i = 0; i < 6; i += 1) {
-    out += alphabet[Math.floor(Math.random() * alphabet.length)];
-  }
-  return out;
-}
-
-function normalizeJoinCode(value) {
+function normalizeRoomPassword(value) {
   if (typeof value !== "string") return "";
-  return value.trim().toUpperCase().slice(0, 20);
+  return value.trim().slice(0, 20);
 }
 
-function buildRoomJoinCodes() {
-  const byRoom = new Map();
-  if (ROOM_JOIN_CODES_ENV) {
-    const parts = ROOM_JOIN_CODES_ENV.split(",").map((s) => s.trim()).filter(Boolean);
-    for (const part of parts) {
-      if (part.includes(":")) {
-        const [roomRaw, codeRaw] = part.split(":");
-        const roomId = normalizeRequestedRoomId(roomRaw);
-        const code = normalizeJoinCode(codeRaw);
-        if (roomId && code) byRoom.set(roomId, code);
-        continue;
-      }
-      const idx = byRoom.size;
-      if (idx >= ROOM_IDS.length) break;
-      const roomId = ROOM_IDS[idx];
-      const code = normalizeJoinCode(part);
-      if (code) byRoom.set(roomId, code);
-    }
-  }
-  for (const roomId of ROOM_IDS) {
-    if (!byRoom.has(roomId)) {
-      byRoom.set(roomId, generateRandomJoinCode());
-    }
-  }
-  return byRoom;
-}
-
-const roomJoinCodes = buildRoomJoinCodes();
-
-function createRoomState(roomId) {
+function createRoomState(roomId, options = {}) {
   return {
     id: roomId,
+    isPublic: Boolean(options.isPublic),
+    password: normalizeRoomPassword(options.password),
     users: new Map(),
     pixels: createEmptyPixels(),
     owners: createEmptyOwners(),
@@ -151,15 +119,25 @@ function performIdleWipe(roomId) {
   if (!room) return;
   room.idleWipeTimer = null;
   if (countOpenClientsInRoom(roomId) > 0) return;
-  resetRoomToEmpty(room);
-  room.lastActivityAt = Date.now();
-  room.boardDirty = false;
+  if (room.isPublic) {
+    resetRoomToEmpty(room);
+    room.lastActivityAt = Date.now();
+    room.boardDirty = false;
+    try {
+      fs.unlinkSync(roomFile(roomId));
+    } catch {
+      // File may not exist.
+    }
+    console.log(`${formatRoomLabel(roomId)} wiped after idle timeout.`);
+    return;
+  }
   try {
     fs.unlinkSync(roomFile(roomId));
   } catch {
     // File may not exist.
   }
-  console.log(`${formatRoomLabel(roomId)} wiped after idle timeout.`);
+  rooms.delete(roomId);
+  console.log(`${formatRoomLabel(roomId)} removed after idle timeout.`);
 }
 
 function scheduleIdleWipeIfEmpty(roomId) {
@@ -183,6 +161,8 @@ function flushRoomSave(roomId) {
     const payload = JSON.stringify({
       version: 1,
       roomId: room.id,
+      isPublic: room.isPublic === true,
+      roomPassword: room.password || "",
       lastActivityAt: room.lastActivityAt,
       pixels: room.pixels,
       chat: room.chat,
@@ -225,6 +205,8 @@ function tryLoadRoomFromDisk(room) {
     room.pixels = data.pixels;
     room.owners = createEmptyOwners();
     room.chat = Array.isArray(data.chat) ? data.chat.slice(-30) : [];
+    room.isPublic = data.isPublic === true || room.id === PUBLIC_ROOM_ID;
+    room.password = normalizeRoomPassword(data.roomPassword || room.password || "");
     room.lastActivityAt = savedAt;
     console.log(`${formatRoomLabel(room.id)} restored from disk.`);
   } catch (err) {
@@ -232,18 +214,30 @@ function tryLoadRoomFromDisk(room) {
   }
 }
 
-function ensureRoom(roomId) {
+function ensureRoom(roomId, options = {}) {
   let room = rooms.get(roomId);
-  if (room) return room;
-  room = createRoomState(roomId);
+  if (room) {
+    if (options.password) {
+      room.password = normalizeRoomPassword(options.password);
+    }
+    if (options.isPublic === true) {
+      room.isPublic = true;
+    }
+    return room;
+  }
+  room = createRoomState(roomId, options);
   tryLoadRoomFromDisk(room);
+  if (options.password) {
+    room.password = normalizeRoomPassword(options.password);
+  }
+  if (options.isPublic === true) {
+    room.isPublic = true;
+  }
   rooms.set(roomId, room);
   return room;
 }
 
-for (const roomId of ROOM_IDS) {
-  ensureRoom(roomId);
-}
+ensureRoom(PUBLIC_ROOM_ID, { isPublic: true });
 
 setInterval(() => {
   for (const room of rooms.values()) {
@@ -312,7 +306,8 @@ function sendInitState(ws, room) {
     JSON.stringify({
       type: "init-state",
       roomId: room.id,
-      roomJoinCode: roomJoinCodes.get(room.id) || "",
+      roomPassword: room.password || "",
+      isPublicRoom: room.isPublic === true,
       gridWidth: GRID_WIDTH,
       gridHeight: GRID_HEIGHT,
       pixels: room.pixels,
@@ -380,26 +375,25 @@ function sanitizeClientKey(value) {
 
 function normalizeRequestedRoomId(value) {
   if (typeof value !== "string") return null;
-  const cleaned = value.trim().toLowerCase();
-  const roomMatch = cleaned.match(/^room-(\d{1,2})$/);
-  const digitMatch = cleaned.match(/^(\d{1,2})$/);
-  const n = Number(roomMatch?.[1] || digitMatch?.[1]);
-  if (!Number.isInteger(n) || n < 1 || n > MAX_ROOMS) return null;
-  return `room-${n}`;
+  const cleaned = value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9_-]/g, "");
+  if (!cleaned) return null;
+  if (!/^[a-z0-9][a-z0-9_-]{1,19}$/.test(cleaned)) return null;
+  return cleaned;
 }
 
-function assignAvailableRoomRandom() {
-  const openRooms = ROOM_IDS.filter((roomId) => countOpenClientsInRoom(roomId) < MAX_USERS_PER_ROOM);
-  if (openRooms.length === 0) return null;
-  const i = Math.floor(Math.random() * openRooms.length);
-  return openRooms[i];
+function isPasswordValidForRoom(room, passwordInput) {
+  const expected = normalizeRoomPassword(room.password || "");
+  if (!expected) return true;
+  const provided = normalizeRoomPassword(passwordInput);
+  return expected === provided;
 }
 
-function isValidRoomCode(roomId, codeInput) {
-  const expected = normalizeJoinCode(roomJoinCodes.get(roomId) || "");
-  const provided = normalizeJoinCode(codeInput);
-  if (!expected || !provided) return false;
-  return provided === expected;
+function canCreateNewRoom() {
+  return rooms.size < MAX_ROOMS;
 }
 
 function resolveRoomForConnection(req) {
@@ -411,36 +405,67 @@ function resolveRoomForConnection(req) {
   }
   const mode = String(query.get("mode") || "").toLowerCase();
   const requestedRoom = normalizeRequestedRoomId(query.get("room"));
-  const roomCode = normalizeJoinCode(query.get("code"));
+  const password = normalizeRoomPassword(query.get("password"));
+  const existingRoom = requestedRoom ? rooms.get(requestedRoom) : null;
+
+  if (mode === "start") {
+    return { roomId: PUBLIC_ROOM_ID };
+  }
 
   if (mode === "join") {
     if (!requestedRoom) {
       return {
         errorCode: 4003,
-        errorMessage: `Invalid room. Use ROOM-1 to ROOM-${MAX_ROOMS}.`,
+        errorMessage: "Invalid room name.",
       };
     }
-    if (!isValidRoomCode(requestedRoom, roomCode)) {
+    if (!existingRoom) {
+      return {
+        errorCode: 4006,
+        errorMessage: "Room does not exist.",
+      };
+    }
+    if (!isPasswordValidForRoom(existingRoom, password)) {
       return {
         errorCode: 4005,
-        errorMessage: "Invalid room code.",
+        errorMessage: "Invalid room password.",
       };
     }
     return { roomId: requestedRoom };
   }
 
-  if (mode === "start" && requestedRoom) {
-    return { roomId: requestedRoom };
+  if (mode === "create") {
+    if (!requestedRoom || requestedRoom === PUBLIC_ROOM_ID) {
+      return {
+        errorCode: 4003,
+        errorMessage: "Choose a custom room name.",
+      };
+    }
+    if (password.length < 4) {
+      return {
+        errorCode: 4007,
+        errorMessage: "Password must be at least 4 characters.",
+      };
+    }
+    if (existingRoom) {
+      return {
+        errorCode: 4008,
+        errorMessage: "Room already exists. Use Join Room.",
+      };
+    }
+    if (!canCreateNewRoom()) {
+      return {
+        errorCode: 4004,
+        errorMessage: `Room limit reached (${MAX_ROOMS}).`,
+      };
+    }
+    return { roomId: requestedRoom, createPassword: password };
   }
 
-  const assigned = assignAvailableRoomRandom();
-  if (!assigned) {
-    return {
-      errorCode: 4004,
-      errorMessage: "All rooms are full. Try again later.",
-    };
-  }
-  return { roomId: assigned };
+  return {
+    errorCode: 4003,
+    errorMessage: "Unsupported room mode.",
+  };
 }
 
 wss.on("connection", (ws, req) => {
@@ -457,6 +482,10 @@ wss.on("connection", (ws, req) => {
   }
 
   const roomId = resolved.roomId;
+  const room = ensureRoom(roomId, {
+    isPublic: roomId === PUBLIC_ROOM_ID,
+    password: resolved.createPassword || "",
+  });
   if (countOpenClientsInRoom(roomId) >= MAX_USERS_PER_ROOM) {
     const label = formatRoomLabel(roomId);
     const msg = `${label} is full (${MAX_USERS_PER_ROOM} max).`;
@@ -464,8 +493,6 @@ wss.on("connection", (ws, req) => {
     ws.close(4004, `${label} full`);
     return;
   }
-
-  const room = ensureRoom(roomId);
   cancelIdleWipe(room);
 
   const userId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
