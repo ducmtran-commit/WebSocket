@@ -25,6 +25,7 @@ const workspaceSectionStack = document.getElementById("workspaceSectionStack");
 const workspaceCollapseBtn = document.getElementById("workspaceCollapseBtn");
 const autoHideBtn = document.getElementById("autoHideBtn");
 const launchGate = document.getElementById("launchGate");
+const launchShell = document.getElementById("launchShell");
 const launchStartBtn = document.getElementById("launchStartBtn");
 const launchJoinBtn = document.getElementById("launchJoinBtn");
 const launchRoomInput = document.getElementById("launchRoomInput");
@@ -163,6 +164,32 @@ function updateRoomUi() {
     copyRoomCodeBtn.disabled = !selectedRoomCode;
     copyRoomCodeBtn.textContent = selectedRoomCode ? "Copy Room Code" : "Copy Room Code (Unavailable)";
   }
+}
+
+function setLaunchConnectMode(nextMode, options = {}) {
+  const joinMode = nextMode === "join";
+  launchConnectMode = joinMode ? "join" : "start";
+  if (launchShell instanceof HTMLElement) {
+    launchShell.classList.toggle("join-mode", joinMode);
+  }
+  if (launchStartBtn instanceof HTMLButtonElement) {
+    launchStartBtn.setAttribute("aria-pressed", String(!joinMode));
+  }
+  if (launchJoinBtn instanceof HTMLButtonElement) {
+    launchJoinBtn.setAttribute("aria-pressed", String(joinMode));
+  }
+  if (launchRoomCodeInput instanceof HTMLInputElement) {
+    launchRoomCodeInput.disabled = !joinMode;
+    launchRoomCodeInput.required = joinMode;
+    if (!joinMode) {
+      launchRoomCodeInput.value = "";
+      selectedRoomCode = "";
+    } else if (options.focusCode) {
+      launchRoomCodeInput.focus({ preventScroll: true });
+      launchRoomCodeInput.select();
+    }
+  }
+  updateRoomUi();
 }
 
 function normalizeRoomCode(value) {
@@ -1073,7 +1100,7 @@ function connect() {
         selectedRoomCode = normalizeRoomCode(msg.roomJoinCode);
       }
       updateRoomUi();
-      launchConnectMode = "join";
+      setLaunchConnectMode("join");
       updateLaunchRoomHint(`Connected to ${displayRoomLabel(selectedRoomId)}.`, false);
       renderState(msg);
       if (pendingPixels.size > 0) {
@@ -1494,6 +1521,7 @@ addColorToHistory(colorInput.value);
 if (statusText instanceof HTMLElement) {
   statusText.textContent = "Status: select room and press start";
 }
+setLaunchConnectMode("start");
 updateLaunchRoomHint(`Up to ${maxRoomCount} rooms, ${maxUsersPerRoom} users each.`, false);
 setSelectedRoom("room-1");
 updateRoomUi();
@@ -1502,7 +1530,7 @@ startRoomPresencePolling();
 if (launchStartBtn instanceof HTMLButtonElement) {
   launchStartBtn.addEventListener("click", (event) => {
     if (hasEnteredBoard) return;
-    launchConnectMode = "start";
+    setLaunchConnectMode("start");
     const requested = normalizeRoomId(launchRoomInput instanceof HTMLInputElement ? launchRoomInput.value : "");
     if (!requested) {
       updateLaunchRoomHint(`Enter ROOM-1 to ROOM-${maxRoomCount}.`, true);
@@ -1520,7 +1548,7 @@ if (launchStartBtn instanceof HTMLButtonElement) {
 if (launchJoinBtn instanceof HTMLButtonElement) {
   launchJoinBtn.addEventListener("click", (event) => {
     if (hasEnteredBoard) return;
-    launchConnectMode = "join";
+    setLaunchConnectMode("join", { focusCode: true });
     const requested = normalizeRoomId(launchRoomInput instanceof HTMLInputElement ? launchRoomInput.value : "");
     if (!requested) {
       updateLaunchRoomHint(`Enter ROOM-1 to ROOM-${maxRoomCount} to join.`, true);
@@ -1544,7 +1572,7 @@ if (launchRoomInput instanceof HTMLInputElement) {
     launchRoomInput.value = launchRoomInput.value.toUpperCase();
     const next = normalizeRoomId(launchRoomInput.value);
     if (next) {
-      selectedRoomId = next;
+      setSelectedRoom(next);
       updateLaunchRoomHint(`Ready for ${displayRoomLabel(next)}.`, false);
       void refreshRoomPresence();
     } else {
