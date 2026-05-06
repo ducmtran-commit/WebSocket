@@ -869,7 +869,6 @@ function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
   // Board-local coords from scroll-space (stable; avoids getBoundingClientRect vs scroll mismatch).
   const lx = (boardViewport.scrollLeft + pivotRelX) / prevZoom;
   const ly = (boardViewport.scrollTop + pivotRelY) / prevZoom;
-  const ratio = clamped / prevZoom;
 
   zoomLevel = clamped;
   zoomInput.value = String(clamped);
@@ -886,19 +885,6 @@ function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
   const maxTop = Math.max(0, boardViewport.scrollHeight - boardViewport.clientHeight);
   boardViewport.scrollLeft = clamp(nextScrollLeft, 0, maxLeft);
   boardViewport.scrollTop = clamp(nextScrollTop, 0, maxTop);
-
-  if (ratio !== 1 && hasAnchor) {
-    void board.offsetWidth;
-    const br = board.getBoundingClientRect();
-    const slipX = pivotX - (br.left + lx * clamped);
-    const slipY = pivotY - (br.top + ly * clamped);
-    if (Math.abs(slipX) > 0.5 || Math.abs(slipY) > 0.5) {
-      const maxL2 = Math.max(0, boardViewport.scrollWidth - boardViewport.clientWidth);
-      const maxT2 = Math.max(0, boardViewport.scrollHeight - boardViewport.clientHeight);
-      boardViewport.scrollLeft = clamp(boardViewport.scrollLeft - slipX, 0, maxL2);
-      boardViewport.scrollTop = clamp(boardViewport.scrollTop - slipY, 0, maxT2);
-    }
-  }
 }
 
 function shouldStartPanning(event) {
@@ -1779,14 +1765,15 @@ board.addEventListener("mousedown", (event) => {
 board.addEventListener("pointerdown", (event) => {
   if (event.pointerType === "mouse") return;
   if (isPanning) return;
-  if (multiFingerTapCandidate) return;
+  if (event.pointerType === "pen") {
+    lastPenUseAt = performance.now();
+  } else if (multiFingerTapCandidate) {
+    return;
+  }
   if (event.pointerType === "touch") {
     if (activeBoardTouchCount > 1) return;
     if (performance.now() < blockTouchPaintUntil) return;
     if (shouldUseFingerPanMode()) return;
-  }
-  if (event.pointerType === "pen") {
-    lastPenUseAt = performance.now();
   }
   event.preventDefault();
   if (board.setPointerCapture) {
@@ -1803,7 +1790,7 @@ board.addEventListener("pointerdown", (event) => {
 board.addEventListener("pointermove", (event) => {
   if (!isPainting) return;
   if (event.pointerType === "mouse") return;
-  if (event.pointerType === "touch" && activeBoardTouchCount > 1) {
+  if (event.pointerType === "touch" && activePaintPointerType === "touch" && activeBoardTouchCount > 1) {
     stopPainting();
     return;
   }
@@ -2131,9 +2118,6 @@ if (boardViewport instanceof HTMLElement) {
     ) {
       boardZoomAnchorClient = { x: event.clientX, y: event.clientY };
     }
-  });
-  boardViewport.addEventListener("pointerleave", () => {
-    boardZoomAnchorClient = null;
   });
   boardViewport.addEventListener(
     "touchend",
