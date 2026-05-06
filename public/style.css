@@ -758,13 +758,28 @@ body.app-gated.entering-canvas .layout {
   border-color: #405a86;
 }
 
+.workspace-room-inputs #workspaceRoomInput {
+  flex: 1 1 42%;
+}
+
+.workspace-room-inputs #workspaceRoomPasswordInput {
+  flex: 1 1 42%;
+}
+
+.workspace-room-inputs #copyRoomCodeBtn {
+  flex: 0 0 auto;
+  min-width: 68px;
+  border-color: #4f4a8b;
+  background: #232547;
+}
+
 .workspace-room-actions {
   margin-top: 6px;
   flex-wrap: wrap;
 }
 
 .workspace-room-actions button {
-  flex: 1 1 31%;
+  flex: 1 1 48%;
   min-width: 72px;
   border-color: #3f5f8b;
   background: #172742;
@@ -775,16 +790,6 @@ body.app-gated.entering-canvas .layout {
 .workspace-room-actions button:hover {
   border-color: #66f7ff;
   background: #1d3559;
-}
-
-.workspace-room-copy-row {
-  margin-top: 6px;
-}
-
-.workspace-room-copy-row button {
-  width: 100%;
-  border-color: #4f4a8b;
-  background: #232547;
 }
 
 .color-history {
