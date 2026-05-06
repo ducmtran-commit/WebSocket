@@ -944,7 +944,7 @@ if (workspaceScroll instanceof HTMLElement) {
     const collapsed = section.classList.toggle("section-collapsed");
     btn.setAttribute("aria-expanded", String(!collapsed));
     btn.setAttribute("aria-label", collapsed ? "Expand section" : "Collapse section");
-    btn.textContent = collapsed ? "▸" : "▾";
+    btn.textContent = collapsed ? "+" : "-";
   });
 }
 
