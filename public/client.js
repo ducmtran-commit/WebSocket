@@ -1673,11 +1673,21 @@ addColorToHistory(colorInput.value);
 if (statusText instanceof HTMLElement) {
   statusText.textContent = "Status: start joins public lobby";
 }
-setLaunchConnectMode("start");
-updateLaunchRoomHint(`Up to ${maxRoomCount} rooms total, ${maxUsersPerRoom} users each.`, false);
-setSelectedRoom(PUBLIC_ROOM_ID);
-updateRoomUi();
-startRoomPresencePolling();
+const lastSession = loadBoardSession();
+if (lastSession) {
+  setSelectedRoom(lastSession.roomId);
+  selectedRoomPassword = lastSession.roomPassword;
+  setLaunchConnectMode(lastSession.mode);
+  updateRoomUi();
+  updateLaunchRoomHint(`Resuming ${displayRoomLabel(lastSession.roomId)}...`, false);
+  enterBoardExperience();
+} else {
+  setLaunchConnectMode("start");
+  updateLaunchRoomHint(`Up to ${maxRoomCount} rooms total, ${maxUsersPerRoom} users each.`, false);
+  setSelectedRoom(PUBLIC_ROOM_ID);
+  updateRoomUi();
+  startRoomPresencePolling();
+}
 
 if (launchStartBtn instanceof HTMLButtonElement) {
   launchStartBtn.addEventListener("click", (event) => {
