@@ -973,12 +973,14 @@ body {
   display: none;
 }
 
-.launch-shell.join-mode #launchRoomCodeRow {
+.launch-shell.join-mode #launchRoomCodeRow,
+.launch-shell.create-mode #launchRoomCodeRow {
   display: flex;
 }
 
 .launch-shell.join-mode #launchJoinBtn,
-.launch-shell:not(.join-mode) #launchStartBtn {
+.launch-shell.create-mode #launchCreateBtn,
+.launch-shell:not(.join-mode):not(.create-mode) #launchStartBtn {
   background: var(--retro-cyan);
   color: #101726;
 }
