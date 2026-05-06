@@ -768,6 +768,19 @@ function getEffectiveMinZoom() {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, fitZoom));
 }
 
+function updateZoomSliderVisual() {
+  if (!(zoomInput instanceof HTMLInputElement)) return;
+  const min = Number(zoomInput.min);
+  const max = Number(zoomInput.max);
+  const value = Number(zoomInput.value);
+  if (!Number.isFinite(min) || !Number.isFinite(max) || !Number.isFinite(value) || max <= min) {
+    zoomInput.style.setProperty("--range-fill", "0%");
+    return;
+  }
+  const percent = clamp(((value - min) / (max - min)) * 100, 0, 100);
+  zoomInput.style.setProperty("--range-fill", `${percent}%`);
+}
+
 function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
   const prevZoom = zoomLevel;
   const minZoom = getEffectiveMinZoom();
@@ -805,6 +818,7 @@ function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
 
   zoomLevel = clamped;
   zoomInput.value = String(clamped);
+  updateZoomSliderVisual();
   zoomText.textContent = `Zoom: ${Math.round(clamped * 100)}%`;
   board.style.transform = `scale(${zoomLevel})`;
 
