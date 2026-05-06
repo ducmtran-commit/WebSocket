@@ -1135,17 +1135,30 @@ input {
 
 @media (max-width: 700px) {
   .workspace-panel {
-    width: calc(100vw - 10px);
-    max-width: 460px;
-    top: 5px;
-    left: 5px;
-    max-height: calc(100dvh - 10px);
-    border-radius: 10px;
+    width: 100vw;
+    max-width: none;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    bottom: 0;
+    max-height: min(56dvh, 520px);
+    border-radius: 12px 12px 0 0;
+    border-bottom: none;
+    padding: 5px 6px calc(5px + env(safe-area-inset-bottom));
+    transform: none !important;
   }
 
   .workspace-drag-handle {
     padding: 4px 6px;
     gap: 4px;
+    cursor: default;
+  }
+
+  .workspace-drag-handle .drag-title::after {
+    content: " (Docked)";
+    color: #93a7c4;
+    font-size: 0.82em;
+    font-weight: 600;
   }
 
   .panel-actions {
@@ -1160,6 +1173,15 @@ input {
 
   .workspace-room-actions button {
     min-width: 0;
+  }
+
+  .workspace-panel.auto-hidden {
+    opacity: 1;
+  }
+
+  .workspace-panel.auto-hidden .workspace-scroll {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .workspace-panel input,
