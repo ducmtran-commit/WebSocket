@@ -39,6 +39,7 @@ const workspaceRoomPasswordInput = document.getElementById("workspaceRoomPasswor
 const workspaceJoinRoomBtn = document.getElementById("workspaceJoinRoomBtn");
 const workspaceCreateRoomBtn = document.getElementById("workspaceCreateRoomBtn");
 const workspaceLobbyBtn = document.getElementById("workspaceLobbyBtn");
+const workspaceBackToLaunchBtn = document.getElementById("workspaceBackToLaunchBtn");
 
 let ws;
 let reconnectAttempts = 0;
@@ -281,6 +282,40 @@ function reconnectToCurrentRoom() {
     return;
   }
   beginConnect();
+}
+
+function returnToLaunchScreen() {
+  if (!hasEnteredBoard) return;
+  hasEnteredBoard = false;
+  shouldReconnect = false;
+  manualRoomSwitchInProgress = false;
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+    try {
+      ws.close(1000, "back-to-launch");
+    } catch {
+      // Ignore close failures while returning to launch.
+    }
+  }
+  if (launchGate instanceof HTMLElement) {
+    launchGate.classList.remove("hidden");
+    launchGate.classList.remove("is-entering");
+  }
+  if (document.body instanceof HTMLElement) {
+    document.body.classList.remove("entering-canvas");
+    document.body.classList.add("app-gated");
+  }
+  saveBoardSession();
+  updateRoomUi();
+  updateLaunchRoomHint(`Choose a room to join or create.`, false);
+  startRoomPresencePolling();
+  void refreshRoomPresence();
+  if (statusText instanceof HTMLElement) {
+    statusText.textContent = "Status: choose room to connect";
+  }
 }
 
 function renderRoomPresence(rooms = []) {
@@ -1849,6 +1884,12 @@ if (workspaceCreateRoomBtn instanceof HTMLButtonElement) {
 if (workspaceLobbyBtn instanceof HTMLButtonElement) {
   workspaceLobbyBtn.addEventListener("click", () => {
     switchRoomFromWorkspace("start");
+  });
+}
+
+if (workspaceBackToLaunchBtn instanceof HTMLButtonElement) {
+  workspaceBackToLaunchBtn.addEventListener("click", () => {
+    returnToLaunchScreen();
   });
 }
 
