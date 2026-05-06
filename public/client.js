@@ -5,6 +5,7 @@ const setNameBtn = document.getElementById("setNameBtn");
 const colorInput = document.getElementById("colorInput");
 const eraserBtn = document.getElementById("eraserBtn");
 const clearBtn = document.getElementById("clearBtn");
+const pencilModeBtn = document.getElementById("pencilModeBtn");
 const zoomInput = document.getElementById("zoomInput");
 const zoomOutBtn = document.getElementById("zoomOutBtn");
 const zoomInBtn = document.getElementById("zoomInBtn");
@@ -98,6 +99,7 @@ const SECTION_REORDER_SLOT_UNSET = Symbol("sectionReorderSlot");
 /** Last drop target for placeholder; avoids repeat `insertBefore` / `appendChild` every mousemove. */
 let sectionReorderInsertBefore = SECTION_REORDER_SLOT_UNSET;
 const COLOR_HISTORY_KEY = "pixel-board-color-history";
+const PENCIL_MODE_KEY = "pixel-board-pencil-mode";
 const CLIENT_KEY_STORAGE = "pixel-board-client-key";
 const BOARD_SESSION_KEY = "pixel-board-last-session";
 const MAX_COLOR_HISTORY = 10;
@@ -111,6 +113,7 @@ let shouldReconnect = true;
 let roomPresencePollTimer = null;
 let manualRoomSwitchInProgress = false;
 let recentColors = [];
+let pencilDrawingMode = false;
 let selfUserId = "";
 const activeDrawingTags = new Map();
 const DRAWING_TAG_MS = 1300;
@@ -610,6 +613,29 @@ function loadColorHistory() {
   }
 }
 
+function syncPencilModeUi() {
+  if (!(pencilModeBtn instanceof HTMLButtonElement)) return;
+  pencilModeBtn.textContent = `Pencil Mode: ${pencilDrawingMode ? "On" : "Off"}`;
+  pencilModeBtn.setAttribute("aria-pressed", String(pencilDrawingMode));
+}
+
+function savePencilModeSetting() {
+  try {
+    window.localStorage.setItem(PENCIL_MODE_KEY, pencilDrawingMode ? "1" : "0");
+  } catch {
+    // Ignore localStorage failures.
+  }
+}
+
+function loadPencilModeSetting() {
+  try {
+    pencilDrawingMode = window.localStorage.getItem(PENCIL_MODE_KEY) === "1";
+  } catch {
+    pencilDrawingMode = false;
+  }
+  syncPencilModeUi();
+}
+
 function shouldHandleCanvasShortcut(event) {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return true;
@@ -999,8 +1025,10 @@ let activeBoardTouchCount = 0;
 let blockTouchPaintUntil = 0;
 let lastPenUseAt = 0;
 let touchPanState = null;
+let touchPinchState = null;
 const TWO_FINGER_TAP_MAX_MS = 380;
 const TWO_FINGER_TAP_MAX_MOVE_PX = 36;
+const TWO_FINGER_PAN_CANCEL_PX = 14;
 const TWO_FINGER_DOUBLE_TAP_MS = 650;
 const THREE_FINGER_DOUBLE_TAP_MS = 650;
 
@@ -1721,7 +1749,7 @@ function beginPainting(clientX, clientY, pointerId = null, pointerType = "mouse"
 }
 
 function shouldUseFingerPanMode() {
-  return performance.now() - lastPenUseAt < 12000;
+  return pencilDrawingMode || performance.now() - lastPenUseAt < 12000;
 }
 
 function continuePainting(clientX, clientY) {
@@ -1912,6 +1940,17 @@ clearBtn.addEventListener("click", () => {
   clearMyDrawingWithConfirm();
 });
 
+if (pencilModeBtn instanceof HTMLButtonElement) {
+  pencilModeBtn.addEventListener("click", () => {
+    pencilDrawingMode = !pencilDrawingMode;
+    if (pencilDrawingMode && activePaintPointerType === "touch") {
+      stopPainting();
+    }
+    syncPencilModeUi();
+    savePencilModeSetting();
+  });
+}
+
 zoomInput.addEventListener("input", () => {
   if (boardZoomAnchorClient) {
     setZoom(zoomInput.value, boardZoomAnchorClient.x, boardZoomAnchorClient.y);
@@ -1972,12 +2011,19 @@ function flushWheelZoomFrame() {
   setZoom(zoomLevel + step, wheelZoomClientX, wheelZoomClientY);
 }
 
+function touchDistance(a, b) {
+  const dx = a.clientX - b.clientX;
+  const dy = a.clientY - b.clientY;
+  return Math.hypot(dx, dy);
+}
+
 if (boardViewport instanceof HTMLElement) {
   boardViewport.addEventListener(
     "touchstart",
     (event) => {
       const fingers = event.touches.length;
       activeBoardTouchCount = fingers;
+      touchPinchState = null;
       if (fingers === 1 && shouldUseFingerPanMode()) {
         const t = event.touches[0];
         touchPanState = {
@@ -1989,6 +2035,14 @@ if (boardViewport instanceof HTMLElement) {
         event.preventDefault();
       } else {
         touchPanState = null;
+      }
+      if (fingers === 2) {
+        const a = event.touches[0];
+        const b = event.touches[1];
+        touchPinchState = {
+          startDistance: Math.max(1, touchDistance(a, b)),
+          startZoom: zoomLevel,
+        };
       }
       if (fingers !== 2 && fingers !== 3) {
         multiFingerTapCandidate = null;
@@ -2020,6 +2074,16 @@ if (boardViewport instanceof HTMLElement) {
         event.preventDefault();
         return;
       }
+      if (touchPinchState && event.touches.length === 2) {
+        const a = event.touches[0];
+        const b = event.touches[1];
+        const nextDistance = Math.max(1, touchDistance(a, b));
+        const ratio = nextDistance / touchPinchState.startDistance;
+        const centerX = (a.clientX + b.clientX) / 2;
+        const centerY = (a.clientY + b.clientY) / 2;
+        setZoom(touchPinchState.startZoom * ratio, centerX, centerY);
+        event.preventDefault();
+      }
       if (!multiFingerTapCandidate || event.touches.length !== multiFingerTapCandidate.fingers) return;
       const a = event.touches[0];
       const b = event.touches[1];
@@ -2027,7 +2091,10 @@ if (boardViewport instanceof HTMLElement) {
       const cy = (a.clientY + b.clientY) / 2;
       const dx = cx - multiFingerTapCandidate.centerX;
       const dy = cy - multiFingerTapCandidate.centerY;
-      if (dx * dx + dy * dy > TWO_FINGER_TAP_MAX_MOVE_PX * TWO_FINGER_TAP_MAX_MOVE_PX) {
+      const moveSq = dx * dx + dy * dy;
+      const cancelPx =
+        multiFingerTapCandidate.fingers === 2 ? TWO_FINGER_PAN_CANCEL_PX : TWO_FINGER_TAP_MAX_MOVE_PX;
+      if (moveSq > cancelPx * cancelPx) {
         multiFingerTapCandidate = null;
       }
     },
@@ -2072,7 +2139,18 @@ if (boardViewport instanceof HTMLElement) {
     "touchend",
     (event) => {
       activeBoardTouchCount = event.touches.length;
-      if (event.touches.length === 0) {
+      if (event.touches.length <= 1) {
+        touchPinchState = null;
+      }
+      if (event.touches.length === 1 && shouldUseFingerPanMode()) {
+        const t = event.touches[0];
+        touchPanState = {
+          x: t.clientX,
+          y: t.clientY,
+          left: boardViewport.scrollLeft,
+          top: boardViewport.scrollTop,
+        };
+      } else if (event.touches.length === 0) {
         touchPanState = null;
       }
       if (!multiFingerTapCandidate) return;
@@ -2111,6 +2189,7 @@ if (boardViewport instanceof HTMLElement) {
     () => {
       activeBoardTouchCount = 0;
       touchPanState = null;
+      touchPinchState = null;
       multiFingerTapCandidate = null;
       stopPainting();
     },
@@ -2241,6 +2320,7 @@ syncToolboxButtons();
 syncWorkspaceCollapseButton();
 loadColorHistory();
 addColorToHistory(colorInput.value);
+loadPencilModeSetting();
 if (statusText instanceof HTMLElement) {
   statusText.textContent = "Status: pick a room and join";
 }
