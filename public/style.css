@@ -444,7 +444,7 @@ body.app-gated.entering-canvas .layout {
   left: 12px;
   width: min(430px, calc(100vw - 24px));
   max-height: calc(100vh - 24px);
-  padding: 8px;
+  padding: 6px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -526,8 +526,8 @@ body.app-gated.entering-canvas .layout {
 .workspace-drag-handle {
   cursor: move;
   user-select: none;
-  margin: -2px 0 4px;
-  padding: 4px 8px;
+  margin: -1px 0 3px;
+  padding: 3px 6px;
   border: 1px dashed #475569;
   border-radius: 6px;
   color: #cbd5e1;
@@ -556,7 +556,7 @@ body.app-gated.entering-canvas .layout {
 }
 
 .workspace-section-row {
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .workspace-section-row:last-child {
@@ -590,8 +590,8 @@ body.app-gated.entering-canvas .layout {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 6px;
-  margin-bottom: 4px;
+  padding: 3px 6px;
+  margin-bottom: 3px;
   border: 1px solid #334155;
   border-radius: 6px;
   background: #0f172a;
@@ -689,13 +689,15 @@ body.app-gated.entering-canvas .layout {
 
 .panel-actions {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   margin-left: auto;
 }
 
 .panel-actions button {
-  padding: 3px 6px;
-  font-size: 0.88rem;
+  padding: 4px 8px;
+  font-size: 0.82rem;
+  line-height: 1.05;
+  min-height: 30px;
 }
 
 .floating-panel.is-dragging {
@@ -713,13 +715,13 @@ body.app-gated.entering-canvas .layout {
 }
 
 #toolText {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   color: #cbd5e1;
   font-size: 0.92rem;
 }
 
 #zoomText {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   color: #cbd5e1;
   font-size: 0.92rem;
 }
@@ -727,7 +729,7 @@ body.app-gated.entering-canvas .layout {
 #statusText,
 #roomText,
 #playersText {
-  margin: 3px 0 0;
+  margin: 1px 0 0;
   font-size: 0.92rem;
   line-height: 1.3;
 }
@@ -736,13 +738,13 @@ body.app-gated.entering-canvas .layout {
   border: 1px solid #334155;
   border-radius: 8px;
   background: #0f1a2e;
-  padding: 8px 10px;
+  padding: 7px 9px;
 }
 
 .workspace-panel .panel > label {
   display: block;
-  margin-top: 6px;
-  margin-bottom: 2px;
+  margin-top: 4px;
+  margin-bottom: 1px;
   font-size: 0.92rem;
   color: #c7d2e4;
   font-weight: 600;
@@ -754,19 +756,19 @@ body.app-gated.entering-canvas .layout {
 
 .row {
   display: flex;
-  gap: 6px;
+  gap: 5px;
 }
 
 .workspace-room-switch {
-  margin-top: 8px;
-  padding: 8px;
+  margin-top: 6px;
+  padding: 6px;
   border: 1px solid #2b3e64;
   border-radius: 8px;
   background: #0d172c;
 }
 
 .workspace-room-switch-title {
-  margin: 0 0 6px;
+  margin: 0 0 4px;
   color: #9db3ff;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -794,7 +796,7 @@ body.app-gated.entering-canvas .layout {
 }
 
 .workspace-room-actions {
-  margin-top: 6px;
+  margin-top: 4px;
   flex-wrap: wrap;
 }
 
@@ -816,7 +818,7 @@ body.app-gated.entering-canvas .layout {
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
-  margin: 4px 0 6px;
+  margin: 3px 0 5px;
 }
 
 .color-swatch {
@@ -842,10 +844,16 @@ button {
 
 .workspace-panel input,
 .workspace-panel button {
-  padding: 8px 10px;
+  padding: 7px 9px;
   font-size: 0.96rem;
   line-height: 1.25;
   font-family: inherit;
+}
+
+.workspace-drag-handle .panel-actions button {
+  padding: 4px 8px;
+  font-size: 0.82rem;
+  line-height: 1.05;
 }
 
 .workspace-panel input[type="range"] {
