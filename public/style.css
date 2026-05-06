@@ -737,6 +737,15 @@ body.app-gated.entering-canvas .layout {
   gap: 6px;
 }
 
+.workspace-room-actions {
+  flex-wrap: wrap;
+}
+
+.workspace-room-actions button {
+  flex: 1 1 30%;
+  min-width: 72px;
+}
+
 .color-history {
   display: flex;
   gap: 4px;
