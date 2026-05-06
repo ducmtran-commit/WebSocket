@@ -55,6 +55,8 @@ let lastPaintGrid = null;
 let paintCapturePointerId = null;
 /** Active pointer id for touch/pen painting sessions. */
 let activePaintPointerId = null;
+/** Pointer type for current paint session ("mouse" | "touch" | "pen"). */
+let activePaintPointerType = null;
 /** Coalesce remote pixel updates to one apply pass per animation frame. */
 const pendingRemotePixels = new Map();
 let remotePixelFlushRaf = null;
@@ -1706,10 +1708,17 @@ function releasePaintCapture() {
   paintCapturePointerId = null;
 }
 
-function beginPainting(clientX, clientY, pointerId = null) {
+function setPenDrawLock(active) {
+  if (!(boardViewport instanceof HTMLElement)) return;
+  boardViewport.classList.toggle("pen-draw-lock", Boolean(active));
+}
+
+function beginPainting(clientX, clientY, pointerId = null, pointerType = "mouse") {
   lastPaintGrid = null;
   isPainting = true;
   activePaintPointerId = typeof pointerId === "number" ? pointerId : null;
+  activePaintPointerType = typeof pointerType === "string" ? pointerType : "mouse";
+  setPenDrawLock(activePaintPointerType === "pen");
   setToolboxDrawingHidden(true);
   paintAtClient(clientX, clientY);
   scheduleFlush();
@@ -1724,8 +1733,10 @@ function stopPainting() {
   if (!isPainting) return;
   isPainting = false;
   activePaintPointerId = null;
+  activePaintPointerType = null;
   lastPaintGrid = null;
   releasePaintCapture();
+  setPenDrawLock(false);
   setToolboxDrawingHidden(false);
   flushPaintBatch();
   renderColorHistory();
@@ -1735,7 +1746,7 @@ board.addEventListener("mousedown", (event) => {
   if (shouldStartPanning(event)) return;
   if (event.button !== 0) return;
   event.preventDefault();
-  beginPainting(event.clientX, event.clientY);
+  beginPainting(event.clientX, event.clientY, null, "mouse");
 });
 
 board.addEventListener("pointerdown", (event) => {
@@ -1755,7 +1766,7 @@ board.addEventListener("pointerdown", (event) => {
       paintCapturePointerId = null;
     }
   }
-  beginPainting(event.clientX, event.clientY, event.pointerId);
+  beginPainting(event.clientX, event.clientY, event.pointerId, event.pointerType);
 });
 
 board.addEventListener("pointermove", (event) => {
@@ -1767,6 +1778,15 @@ board.addEventListener("pointermove", (event) => {
   }
   if (activePaintPointerId != null && event.pointerId !== activePaintPointerId) return;
   event.preventDefault();
+  if (event.pointerType === "pen" && typeof event.getCoalescedEvents === "function") {
+    const coalesced = event.getCoalescedEvents();
+    if (Array.isArray(coalesced) && coalesced.length > 0) {
+      for (const pe of coalesced) {
+        continuePainting(pe.clientX, pe.clientY);
+      }
+      return;
+    }
+  }
   continuePainting(event.clientX, event.clientY);
 });
 
