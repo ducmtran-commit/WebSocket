@@ -25,7 +25,6 @@ const workspaceSectionStack = document.getElementById("workspaceSectionStack");
 const workspaceCollapseBtn = document.getElementById("workspaceCollapseBtn");
 const autoHideBtn = document.getElementById("autoHideBtn");
 const launchGate = document.getElementById("launchGate");
-const launchLoadingBar = document.getElementById("launchLoadingBar");
 const launchStartBtn = document.getElementById("launchStartBtn");
 const launchJoinBtn = document.getElementById("launchJoinBtn");
 const launchRoomInput = document.getElementById("launchRoomInput");
@@ -76,11 +75,7 @@ let workspaceDragLastY = 0;
 let workspaceHidden = false;
 let workspaceHideTimer = null;
 let hasEnteredBoard = false;
-const LAUNCH_LOADING_PIXEL_MIN = 7;
-const LAUNCH_LOADING_PIXEL_MAX = 14;
 const LAUNCH_ENTER_ANIM_MS = 760;
-let launchLoadingPixelCount = LAUNCH_LOADING_PIXEL_MAX;
-let launchFilledPixels = 0;
 let sectionReorder = null;
 const SECTION_REORDER_SLOT_UNSET = Symbol("sectionReorderSlot");
 /** Last drop target for placeholder; avoids repeat `insertBefore` / `appendChild` every mousemove. */
@@ -271,55 +266,6 @@ function playLaunchPixelSound(progress = 0) {
   const base = 300 + Math.floor(clamp(progress, 0, 1) * 260);
   voice(base, 0, 0.05);
   voice(base * 1.33, 0.045, 0.08);
-}
-
-function buildLaunchLoadingBar() {
-  if (!(launchLoadingBar instanceof HTMLElement)) return;
-  launchLoadingBar.innerHTML = "";
-  launchLoadingPixelCount =
-    Math.floor(Math.random() * (LAUNCH_LOADING_PIXEL_MAX - LAUNCH_LOADING_PIXEL_MIN + 1)) +
-    LAUNCH_LOADING_PIXEL_MIN;
-  launchFilledPixels = 0;
-  const initialFilled = Math.floor(Math.random() * launchLoadingPixelCount);
-  for (let i = 0; i < launchLoadingPixelCount; i += 1) {
-    const cell = document.createElement("button");
-    cell.type = "button";
-    cell.className = "loading-pixel";
-    cell.setAttribute("aria-label", `Fill loading pixel ${i + 1}`);
-    const shouldStartFilled = i < initialFilled;
-    cell.dataset.filled = shouldStartFilled ? "1" : "0";
-    if (shouldStartFilled) {
-      cell.classList.add("filled");
-      launchFilledPixels += 1;
-    }
-    launchLoadingBar.appendChild(cell);
-  }
-  const firstCell = launchLoadingBar.querySelector(".loading-pixel");
-  if (firstCell instanceof HTMLElement) {
-    firstCell.focus({ preventScroll: true });
-  }
-}
-
-function fillNextLaunchPixel(sourceEvent = null) {
-  if (hasEnteredBoard || !(launchLoadingBar instanceof HTMLElement)) return;
-  const nextUnfilled = launchLoadingBar.querySelector('.loading-pixel[data-filled="0"]');
-  if (!(nextUnfilled instanceof HTMLElement)) return;
-  nextUnfilled.dataset.filled = "1";
-  nextUnfilled.classList.add("filled");
-  launchFilledPixels += 1;
-  playLaunchPixelSound(launchFilledPixels / Math.max(1, launchLoadingPixelCount));
-  if (launchFilledPixels >= launchLoadingPixelCount) {
-    window.setTimeout(() => {
-      enterBoardExperience(sourceEvent);
-    }, 90);
-  }
-}
-
-function fillAllLaunchPixels(sourceEvent = null) {
-  if (hasEnteredBoard || !(launchLoadingBar instanceof HTMLElement)) return;
-  while (launchFilledPixels < launchLoadingPixelCount) {
-    fillNextLaunchPixel(sourceEvent);
-  }
 }
 
 function setEnterOriginFromClick(sourceEvent) {
@@ -1552,11 +1498,6 @@ updateLaunchRoomHint(`Up to ${maxRoomCount} rooms, ${maxUsersPerRoom} users each
 setSelectedRoom("room-1");
 updateRoomUi();
 startRoomPresencePolling();
-if (launchLoadingBar instanceof HTMLElement) {
-  buildLaunchLoadingBar();
-} else {
-  enterBoardExperience();
-}
 
 if (launchStartBtn instanceof HTMLButtonElement) {
   launchStartBtn.addEventListener("click", (event) => {
