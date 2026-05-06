@@ -429,6 +429,10 @@ function resolveRoomForConnection(req) {
     return { roomId: requestedRoom };
   }
 
+  if (mode === "start" && requestedRoom) {
+    return { roomId: requestedRoom };
+  }
+
   const assigned = assignAvailableRoomRandom();
   if (!assigned) {
     return {
