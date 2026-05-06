@@ -57,6 +57,14 @@ function roomFile(roomId) {
   return path.join(ROOMS_DIR, `${roomId}.json`);
 }
 
+function removeRoomSaveFile(roomId) {
+  try {
+    fs.unlinkSync(roomFile(roomId));
+  } catch {
+    // File may not exist.
+  }
+}
+
 function formatRoomLabel(roomId) {
   if (roomId === PUBLIC_ROOM_ID) return "LOBBY";
   return String(roomId || "").replace(/-/g, " ").toUpperCase();
@@ -217,6 +225,13 @@ function tryLoadRoomFromDisk(room) {
 function ensureRoom(roomId, options = {}) {
   let room = rooms.get(roomId);
   if (room) {
+    if (options.resetState === true) {
+      resetRoomToEmpty(room);
+      room.lastActivityAt = Date.now();
+      room.boardDirty = false;
+      room.users.clear();
+      removeRoomSaveFile(roomId);
+    }
     if (options.password) {
       room.password = normalizeRoomPassword(options.password);
     }
@@ -226,7 +241,11 @@ function ensureRoom(roomId, options = {}) {
     return room;
   }
   room = createRoomState(roomId, options);
-  tryLoadRoomFromDisk(room);
+  if (options.skipLoadFromDisk !== true) {
+    tryLoadRoomFromDisk(room);
+  } else {
+    removeRoomSaveFile(roomId);
+  }
   if (options.password) {
     room.password = normalizeRoomPassword(options.password);
   }
@@ -459,7 +478,7 @@ function resolveRoomForConnection(req) {
         errorMessage: `Room limit reached (${MAX_ROOMS}).`,
       };
     }
-    return { roomId: requestedRoom, createPassword: password };
+    return { roomId: requestedRoom, createPassword: password, createFresh: true };
   }
 
   return {
@@ -485,6 +504,8 @@ wss.on("connection", (ws, req) => {
   const room = ensureRoom(roomId, {
     isPublic: roomId === PUBLIC_ROOM_ID,
     password: resolved.createPassword || "",
+    skipLoadFromDisk: resolved.createFresh === true,
+    resetState: resolved.createFresh === true,
   });
   if (countOpenClientsInRoom(roomId) >= MAX_USERS_PER_ROOM) {
     const label = formatRoomLabel(roomId);
