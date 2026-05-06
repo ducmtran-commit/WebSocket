@@ -11,6 +11,7 @@ const zoomInBtn = document.getElementById("zoomInBtn");
 const zoomText = document.getElementById("zoomText");
 const toolText = document.getElementById("toolText");
 const statusText = document.getElementById("statusText");
+const roomText = document.getElementById("roomText");
 const playersText = document.getElementById("playersText");
 const userList = document.getElementById("userList");
 const chatBox = document.getElementById("chatBox");
@@ -31,6 +32,7 @@ const launchRoomInput = document.getElementById("launchRoomInput");
 const launchRoomCodeInput = document.getElementById("launchRoomCodeInput");
 const launchRoomHint = document.getElementById("launchRoomHint");
 const launchRoomList = document.getElementById("launchRoomList");
+const copyRoomCodeBtn = document.getElementById("copyRoomCodeBtn");
 
 let ws;
 let reconnectAttempts = 0;
@@ -153,6 +155,18 @@ function setSelectedRoom(roomId) {
   selectedRoomId = roomId;
   if (launchRoomInput instanceof HTMLInputElement) {
     launchRoomInput.value = displayRoomLabel(roomId);
+  }
+  updateRoomUi();
+}
+
+function updateRoomUi() {
+  if (roomText instanceof HTMLElement) {
+    const label = selectedRoomId ? displayRoomLabel(selectedRoomId) : "-";
+    roomText.textContent = `Room: ${label}`;
+  }
+  if (copyRoomCodeBtn instanceof HTMLButtonElement) {
+    copyRoomCodeBtn.disabled = !selectedRoomCode;
+    copyRoomCodeBtn.textContent = selectedRoomCode ? "Copy Room Code" : "Copy Room Code (Unavailable)";
   }
 }
 
@@ -1111,15 +1125,10 @@ function connect() {
       }
       if (typeof msg.roomJoinCode === "string") {
         selectedRoomCode = normalizeRoomCode(msg.roomJoinCode);
-        if (launchRoomCodeInput instanceof HTMLInputElement) {
-          launchRoomCodeInput.value = selectedRoomCode;
-        }
       }
+      updateRoomUi();
       launchConnectMode = "join";
-      updateLaunchRoomHint(
-        `Connected to ${displayRoomLabel(selectedRoomId)} | code: ${selectedRoomCode || "N/A"}`,
-        false
-      );
+      updateLaunchRoomHint(`Connected to ${displayRoomLabel(selectedRoomId)}.`, false);
       renderState(msg);
       if (pendingPixels.size > 0) {
         for (const pixel of pendingPixels.values()) {
@@ -1537,19 +1546,14 @@ syncWorkspaceCollapseButton();
 loadColorHistory();
 addColorToHistory(colorInput.value);
 if (statusText instanceof HTMLElement) {
-  statusText.textContent = "Status: press start for random room";
+  statusText.textContent = "Status: select room and press start";
 }
 updateLaunchRoomHint(`Up to ${maxRoomCount} rooms, ${maxUsersPerRoom} users each.`, false);
 setSelectedRoom("room-1");
+updateRoomUi();
 startRoomPresencePolling();
 if (launchLoadingBar instanceof HTMLElement) {
   buildLaunchLoadingBar();
-  launchLoadingBar.addEventListener("click", (event) => {
-    if (hasEnteredBoard) return;
-    const target = event.target;
-    if (!(target instanceof HTMLElement) || !target.classList.contains("loading-pixel")) return;
-    fillNextLaunchPixel(event);
-  });
 } else {
   enterBoardExperience();
 }
@@ -1558,11 +1562,17 @@ if (launchStartBtn instanceof HTMLButtonElement) {
   launchStartBtn.addEventListener("click", (event) => {
     if (hasEnteredBoard) return;
     launchConnectMode = "start";
-    selectedRoomId = "";
+    const requested = normalizeRoomId(launchRoomInput instanceof HTMLInputElement ? launchRoomInput.value : "");
+    if (!requested) {
+      updateLaunchRoomHint(`Enter ROOM-1 to ROOM-${maxRoomCount}.`, true);
+      return;
+    }
+    setSelectedRoom(requested);
     selectedRoomCode = "";
-    updateLaunchRoomHint("Finding a random available room...", false);
+    updateRoomUi();
+    updateLaunchRoomHint(`Starting ${displayRoomLabel(requested)}...`, false);
     void refreshRoomPresence();
-    fillAllLaunchPixels(event);
+    enterBoardExperience(event);
   });
 }
 
@@ -1582,8 +1592,9 @@ if (launchJoinBtn instanceof HTMLButtonElement) {
     }
     setSelectedRoom(requested);
     selectedRoomCode = code;
+    updateRoomUi();
     updateLaunchRoomHint(`Joining ${displayRoomLabel(requested)} with code...`, false);
-    fillAllLaunchPixels(event);
+    enterBoardExperience(event);
   });
 }
 
@@ -1605,6 +1616,25 @@ if (launchRoomCodeInput instanceof HTMLInputElement) {
   launchRoomCodeInput.addEventListener("input", () => {
     launchRoomCodeInput.value = launchRoomCodeInput.value.toUpperCase();
     selectedRoomCode = normalizeRoomCode(launchRoomCodeInput.value);
+    updateRoomUi();
+  });
+}
+
+if (copyRoomCodeBtn instanceof HTMLButtonElement) {
+  copyRoomCodeBtn.addEventListener("click", async () => {
+    if (!selectedRoomCode) {
+      updateLaunchRoomHint("Room code unavailable yet. Connect first.", true);
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(selectedRoomCode);
+      copyRoomCodeBtn.textContent = "Code Copied!";
+      window.setTimeout(() => {
+        updateRoomUi();
+      }, 1200);
+    } catch {
+      updateLaunchRoomHint("Could not copy automatically. Please copy manually.", true);
+    }
   });
 }
 
