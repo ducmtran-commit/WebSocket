@@ -500,6 +500,7 @@ function renderColorHistory() {
       button.classList.add("active");
     }
     button.addEventListener("click", () => {
+      commitPendingPaintAction();
       colorInput.value = color;
       if (isErasing) {
         isErasing = false;
@@ -1387,6 +1388,11 @@ function flushPaintBatch() {
   }
 }
 
+function commitPendingPaintAction() {
+  if (pendingPixels.size === 0) return;
+  flushPaintBatch();
+}
+
 function scheduleFlush() {
   if (flushTimer) return;
   flushTimer = window.setTimeout(flushPaintBatch, 14);
@@ -1528,6 +1534,7 @@ setNameBtn.addEventListener("click", () => {
 });
 
 eraserBtn.addEventListener("click", () => {
+  commitPendingPaintAction();
   isErasing = !isErasing;
   eraserBtn.textContent = `Eraser: ${isErasing ? "On" : "Off"}`;
   toolText.textContent = `Tool: ${isErasing ? "Eraser" : "Brush"}`;
@@ -1573,6 +1580,12 @@ zoomInBtn.addEventListener("click", () => {
 });
 
 colorInput.addEventListener("change", () => {
+  commitPendingPaintAction();
+  if (isErasing) {
+    isErasing = false;
+    eraserBtn.textContent = "Eraser: Off";
+    toolText.textContent = "Tool: Brush";
+  }
   addColorToHistory(colorInput.value);
 });
 
@@ -1675,6 +1688,7 @@ window.addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
   if (!event.ctrlKey && !event.metaKey && !event.altKey && key === "e") {
     event.preventDefault();
+    commitPendingPaintAction();
     isErasing = !isErasing;
     eraserBtn.textContent = `Eraser: ${isErasing ? "On" : "Off"}`;
     toolText.textContent = `Tool: ${isErasing ? "Eraser" : "Brush"}`;
