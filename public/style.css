@@ -513,7 +513,7 @@ body.app-gated.entering-canvas .layout {
   border-radius: 6px;
   color: #cbd5e1;
   background: #111827;
-  font-size: 0.8rem;
+  font-size: 0.86rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -619,7 +619,7 @@ body.app-gated.entering-canvas .layout {
 .section-title {
   flex: 1;
   font-weight: 600;
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   color: #e2e8f0;
 }
 
@@ -627,7 +627,7 @@ body.app-gated.entering-canvas .layout {
   flex-shrink: 0;
   min-width: 32px;
   padding: 2px 8px;
-  font-size: 0.85rem;
+  font-size: 0.92rem;
   line-height: 1.3;
   border-radius: 6px;
   border: 1px solid #475569;
@@ -658,7 +658,7 @@ body.app-gated.entering-canvas .layout {
 
 .workspace-section-body > .subtitle {
   margin: 0 0 6px;
-  font-size: 0.78rem;
+  font-size: 0.84rem;
   line-height: 1.35;
 }
 
@@ -674,7 +674,7 @@ body.app-gated.entering-canvas .layout {
 
 .panel-actions button {
   padding: 3px 6px;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
 }
 
 .floating-panel.is-dragging {
@@ -694,20 +694,20 @@ body.app-gated.entering-canvas .layout {
 #toolText {
   margin: 4px 0 0;
   color: #cbd5e1;
-  font-size: 0.78rem;
+  font-size: 0.84rem;
 }
 
 #zoomText {
   margin: 4px 0 0;
   color: #cbd5e1;
-  font-size: 0.78rem;
+  font-size: 0.84rem;
 }
 
 #statusText,
 #roomText,
 #playersText {
   margin: 3px 0 0;
-  font-size: 0.78rem;
+  font-size: 0.84rem;
   line-height: 1.3;
 }
 
@@ -722,7 +722,7 @@ body.app-gated.entering-canvas .layout {
   display: block;
   margin-top: 6px;
   margin-bottom: 2px;
-  font-size: 0.78rem;
+  font-size: 0.84rem;
   color: #94a3b8;
 }
 
@@ -765,8 +765,8 @@ button {
 
 .workspace-panel input,
 .workspace-panel button {
-  padding: 6px 8px;
-  font-size: 0.82rem;
+  padding: 7px 9px;
+  font-size: 0.88rem;
 }
 
 button {
@@ -785,7 +785,7 @@ input {
   padding: 6px;
   margin-bottom: 6px;
   background: #0b1220;
-  font-size: 0.82rem;
+  font-size: 0.88rem;
 }
 
 .chat-line {
