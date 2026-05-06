@@ -48,7 +48,8 @@ Optional env vars:
 - `NODE_ENV=production`
 - `NODE_VERSION=18`
 - `BOARD_RETENTION_HOURS=72` (keep saved board for 72 hours since last activity)
-- `BOARD_IDLE_WIPE_MINUTES=4320` (wipe in-memory board only after 3 days with no connected clients)
+- `BOARD_IDLE_WIPE_MINUTES=4320` (wipe public room in-memory board after 3 days with no connected clients)
+- `PRIVATE_ROOM_IDLE_DELETE_MINUTES=60` (delete private rooms after 1 hour with no connected clients)
 
 ## Submission Text (Example)
 
