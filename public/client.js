@@ -80,6 +80,10 @@ let workspaceDragging = false;
 let workspaceDragLastX = 0;
 let workspaceDragLastY = 0;
 let workspaceDragPointerId = null;
+const WORKSPACE_DRAG_HOLD_MS = 170;
+const WORKSPACE_DRAG_HOLD_MOVE_CANCEL_PX = 10;
+let workspacePendingDrag = null;
+let workspaceDragHoldTimer = null;
 let workspaceHidden = false;
 let workspaceHideTimer = null;
 let hasEnteredBoard = false;
@@ -870,8 +874,34 @@ function tryWorkspaceFastDoubleTap(event) {
   return false;
 }
 
+function clearWorkspacePendingDrag() {
+  if (workspaceDragHoldTimer != null) {
+    window.clearTimeout(workspaceDragHoldTimer);
+    workspaceDragHoldTimer = null;
+  }
+  workspacePendingDrag = null;
+}
+
+function queueWorkspaceDragStart(event) {
+  clearWorkspacePendingDrag();
+  workspacePendingDrag = {
+    pointerId: typeof event.pointerId === "number" ? event.pointerId : null,
+    startX: event.clientX,
+    startY: event.clientY,
+    clientX: event.clientX,
+    clientY: event.clientY,
+  };
+  workspaceDragHoldTimer = window.setTimeout(() => {
+    workspaceDragHoldTimer = null;
+    if (!workspacePendingDrag || workspaceDragging) return;
+    startWorkspaceDrag(workspacePendingDrag);
+    workspacePendingDrag = null;
+  }, WORKSPACE_DRAG_HOLD_MS);
+}
+
 function startWorkspaceDrag(event) {
   if (!(workspacePanel instanceof HTMLElement)) return;
+  clearWorkspacePendingDrag();
   workspaceDragging = true;
   workspaceDragLastX = event.clientX;
   workspaceDragLastY = event.clientY;
@@ -897,6 +927,7 @@ function dragWorkspace(event) {
 
 function stopWorkspaceDrag() {
   if (!(workspacePanel instanceof HTMLElement)) return;
+  clearWorkspacePendingDrag();
   if (workspaceHandle instanceof HTMLElement && workspaceDragPointerId != null && workspaceHandle.releasePointerCapture) {
     try {
       workspaceHandle.releasePointerCapture(workspaceDragPointerId);
@@ -1006,6 +1037,7 @@ if (workspaceHandle instanceof HTMLElement) {
   workspaceHandle.addEventListener("dblclick", (event) => {
     event.preventDefault();
     event.stopPropagation();
+    clearWorkspacePendingDrag();
     if (workspaceDragging) {
       stopWorkspaceDrag();
     }
@@ -1020,7 +1052,25 @@ if (workspaceHandle instanceof HTMLElement) {
       stopWorkspaceDrag();
       return;
     }
-    startWorkspaceDrag(event);
+    queueWorkspaceDragStart(event);
+  });
+  workspaceHandle.addEventListener("pointermove", (event) => {
+    if (!workspacePendingDrag) return;
+    if (workspacePendingDrag.pointerId != null && workspacePendingDrag.pointerId !== event.pointerId) return;
+    const dx = event.clientX - workspacePendingDrag.startX;
+    const dy = event.clientY - workspacePendingDrag.startY;
+    if (dx * dx + dy * dy > WORKSPACE_DRAG_HOLD_MOVE_CANCEL_PX * WORKSPACE_DRAG_HOLD_MOVE_CANCEL_PX) {
+      clearWorkspacePendingDrag();
+      return;
+    }
+    workspacePendingDrag.clientX = event.clientX;
+    workspacePendingDrag.clientY = event.clientY;
+  });
+  workspaceHandle.addEventListener("pointerup", () => {
+    clearWorkspacePendingDrag();
+  });
+  workspaceHandle.addEventListener("pointercancel", () => {
+    clearWorkspacePendingDrag();
   });
 }
 
@@ -1411,12 +1461,14 @@ window.addEventListener("mouseup", () => {
 });
 
 window.addEventListener("pointerup", () => {
+  clearWorkspacePendingDrag();
   if (workspaceDragging) {
     stopWorkspaceDrag();
   }
 });
 
 window.addEventListener("pointercancel", () => {
+  clearWorkspacePendingDrag();
   if (workspaceDragging) {
     stopWorkspaceDrag();
   }
@@ -1452,6 +1504,7 @@ window.addEventListener("mousemove", (event) => {
 });
 
 window.addEventListener("blur", () => {
+  clearWorkspacePendingDrag();
   if (workspaceDragging) {
     stopWorkspaceDrag();
   }
@@ -1460,6 +1513,7 @@ window.addEventListener("blur", () => {
 
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "visible") {
+    clearWorkspacePendingDrag();
     if (workspaceDragging) {
       stopWorkspaceDrag();
     }
