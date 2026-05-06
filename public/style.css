@@ -878,6 +878,7 @@ input {
   min-width: max-content;
   transform-origin: top left;
   will-change: transform;
+  position: relative;
   user-select: none;
   -webkit-user-drag: none;
   /* Keep board edge visible against viewport background while panning. */
@@ -892,6 +893,7 @@ input {
   height: 100vh;
   border: none;
   border-radius: 0;
+  position: relative;
   background:
     repeating-linear-gradient(0deg, rgba(68, 247, 248, 0.035) 0 1px, transparent 1px 18px),
     repeating-linear-gradient(90deg, rgba(68, 247, 248, 0.035) 0 1px, transparent 1px 18px),
@@ -908,6 +910,56 @@ input {
 .board-viewport.is-panning {
   cursor: grabbing;
   user-select: none;
+}
+
+.drawing-tag-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.drawing-tag {
+  position: absolute;
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(15, 23, 42, 0.88);
+  color: #e2e8f0;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  line-height: 1.1;
+  box-shadow: 0 3px 12px rgba(2, 6, 23, 0.45);
+  opacity: 0;
+  transform: translate(-50%, -115%);
+  animation: drawingTagIn 120ms ease forwards;
+}
+
+.drawing-tag.is-fading {
+  animation: drawingTagOut 170ms ease forwards;
+}
+
+@keyframes drawingTagIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -118%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -115%);
+  }
+}
+
+@keyframes drawingTagOut {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -115%);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -120%);
+  }
 }
 
 .cell {
