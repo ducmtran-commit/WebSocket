@@ -38,6 +38,8 @@ const workspaceRoomPasswordInput = document.getElementById("workspaceRoomPasswor
 const workspaceJoinRoomBtn = document.getElementById("workspaceJoinRoomBtn");
 const workspaceCreateRoomBtn = document.getElementById("workspaceCreateRoomBtn");
 const workspaceBackToLaunchBtn = document.getElementById("workspaceBackToLaunchBtn");
+const shortcutHelpOverlay = document.getElementById("shortcutHelpOverlay");
+const shortcutHelpCloseBtn = document.getElementById("shortcutHelpCloseBtn");
 let drawingTagLayer = null;
 
 let ws;
@@ -369,6 +371,7 @@ function returnToLaunchScreen() {
     document.body.classList.remove("entering-canvas");
     document.body.classList.add("app-gated");
   }
+  setShortcutHelpOpen(false);
   saveBoardSession();
   updateRoomUi();
   updateLaunchRoomHint(`Choose a room to join or create.`, false);
@@ -606,6 +609,17 @@ function shouldHandleCanvasShortcut(event) {
   if (!(target instanceof HTMLElement)) return true;
   const tag = target.tagName;
   return tag !== "INPUT" && tag !== "TEXTAREA" && !target.isContentEditable;
+}
+
+function isShortcutHelpOpen() {
+  return shortcutHelpOverlay instanceof HTMLElement && !shortcutHelpOverlay.classList.contains("hidden");
+}
+
+function setShortcutHelpOpen(shouldOpen) {
+  if (!(shortcutHelpOverlay instanceof HTMLElement)) return;
+  const open = Boolean(shouldOpen);
+  shortcutHelpOverlay.classList.toggle("hidden", !open);
+  shortcutHelpOverlay.setAttribute("aria-hidden", String(!open));
 }
 
 function isValidPixelGrid(pixels, height, width) {
@@ -1866,9 +1880,34 @@ chatInput.addEventListener("keydown", (event) => {
   sendChatBtn.click();
 });
 
+if (shortcutHelpCloseBtn instanceof HTMLButtonElement) {
+  shortcutHelpCloseBtn.addEventListener("click", () => {
+    setShortcutHelpOpen(false);
+  });
+}
+
+if (shortcutHelpOverlay instanceof HTMLElement) {
+  shortcutHelpOverlay.addEventListener("click", (event) => {
+    if (event.target !== shortcutHelpOverlay) return;
+    setShortcutHelpOpen(false);
+  });
+}
+
 window.addEventListener("keydown", (event) => {
-  const canUseCanvasShortcut = shouldHandleCanvasShortcut(event);
   if (!hasEnteredBoard) return;
+  if (!event.ctrlKey && !event.metaKey && !event.altKey && event.code === "Backquote") {
+    event.preventDefault();
+    setShortcutHelpOpen(!isShortcutHelpOpen());
+    return;
+  }
+  if (isShortcutHelpOpen()) {
+    if (event.code === "Escape") {
+      event.preventDefault();
+      setShortcutHelpOpen(false);
+    }
+    return;
+  }
+  const canUseCanvasShortcut = shouldHandleCanvasShortcut(event);
   if (event.code === "Escape" && canUseCanvasShortcut) {
     event.preventDefault();
     if (isLaunchGateVisible()) {
