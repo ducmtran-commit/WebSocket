@@ -1656,6 +1656,11 @@ chatInput.addEventListener("keydown", (event) => {
 window.addEventListener("keydown", (event) => {
   const canUseCanvasShortcut = shouldHandleCanvasShortcut(event);
   if (!hasEnteredBoard) return;
+  if (event.code === "Escape" && canUseCanvasShortcut) {
+    event.preventDefault();
+    returnToLaunchScreen();
+    return;
+  }
   if (event.code === "Tab" && canUseCanvasShortcut) {
     if (event.repeat) return;
     event.preventDefault();
