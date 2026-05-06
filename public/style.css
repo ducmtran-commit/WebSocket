@@ -1016,6 +1016,7 @@ input {
   overflow: auto;
   width: 100%;
   height: 100vh;
+  height: 100dvh;
   border: none;
   border-radius: 0;
   position: relative;
@@ -1103,15 +1104,73 @@ input {
 
 @media (max-width: 920px) {
   .workspace-panel {
-    width: min(380px, calc(100vw - 20px));
-    top: 10px;
-    left: 10px;
-    max-height: calc(100vh - 20px);
-    padding: 6px;
+    width: min(360px, calc(100vw - 14px));
+    top: 7px;
+    left: 7px;
+    max-height: calc(100dvh - 14px);
+    padding: 5px;
+  }
+
+  .workspace-scroll {
+    padding-right: 1px;
+  }
+
+  .workspace-panel .panel > label,
+  #toolText,
+  #zoomText,
+  #statusText,
+  #roomText,
+  #playersText,
+  .workspace-panel input,
+  .workspace-panel button,
+  .chat-box {
+    font-size: 1rem !important;
   }
 
   .board-viewport {
     height: 100vh;
+    height: 100dvh;
+  }
+}
+
+@media (max-width: 700px) {
+  .workspace-panel {
+    width: calc(100vw - 10px);
+    max-width: 460px;
+    top: 5px;
+    left: 5px;
+    max-height: calc(100dvh - 10px);
+    border-radius: 10px;
+  }
+
+  .workspace-drag-handle {
+    padding: 4px 6px;
+    gap: 4px;
+  }
+
+  .panel-actions {
+    gap: 3px;
+  }
+
+  .panel-actions button {
+    min-height: 32px;
+    padding: 4px 7px;
+    font-size: 0.8rem;
+  }
+
+  .workspace-room-actions button {
+    min-width: 0;
+  }
+
+  .workspace-panel input,
+  .workspace-panel button {
+    min-height: 36px;
+  }
+
+  .shortcut-help-card {
+    width: calc(100vw - 14px);
+    max-height: calc(100dvh - 16px);
+    padding: 12px 12px;
   }
 }
 
