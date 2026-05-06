@@ -38,6 +38,7 @@ const workspaceRoomPasswordInput = document.getElementById("workspaceRoomPasswor
 const workspaceJoinRoomBtn = document.getElementById("workspaceJoinRoomBtn");
 const workspaceCreateRoomBtn = document.getElementById("workspaceCreateRoomBtn");
 const workspaceBackToLaunchBtn = document.getElementById("workspaceBackToLaunchBtn");
+let drawingTagLayer = null;
 
 let ws;
 let reconnectAttempts = 0;
@@ -102,6 +103,9 @@ let shouldReconnect = true;
 let roomPresencePollTimer = null;
 let manualRoomSwitchInProgress = false;
 let recentColors = [];
+let selfUserId = "";
+const activeDrawingTags = new Map();
+const DRAWING_TAG_MS = 1300;
 
 /** Stable id for paint ownership across page refresh (server `ownerKey`). */
 function getOrCreateClientKey() {
@@ -626,7 +630,9 @@ function clonePixelGridFrom(pixels, height, width) {
 }
 
 function createBoard(state) {
+  clearDrawingActivityTags();
   board.innerHTML = "";
+  drawingTagLayer = null;
   cellEls = Array.from({ length: state.gridHeight }, () => Array(state.gridWidth).fill(null));
   board.style.gridTemplateColumns = `repeat(${state.gridWidth}, ${BASE_PIXEL_SIZE}px)`;
   board.style.gridAutoRows = `${BASE_PIXEL_SIZE}px`;
@@ -642,6 +648,10 @@ function createBoard(state) {
       board.appendChild(cell);
     }
   }
+  drawingTagLayer = document.createElement("div");
+  drawingTagLayer.className = "drawing-tag-layer";
+  drawingTagLayer.setAttribute("aria-hidden", "true");
+  board.appendChild(drawingTagLayer);
 }
 
 function applyPixel(x, y, color) {
@@ -1230,10 +1240,90 @@ function renderUsers(users) {
   userList.innerHTML = "";
   users.forEach((player) => {
       const li = document.createElement("li");
-      li.textContent = player.name;
+      const isSelf = String(player.id || "") === String(selfUserId || "");
+      li.textContent = isSelf ? `${player.name} (You)` : player.name;
       li.style.color = player.color;
       userList.appendChild(li);
     });
+}
+
+function clearDrawingActivityTags() {
+  for (const state of activeDrawingTags.values()) {
+    if (state?.timerId != null) {
+      window.clearTimeout(state.timerId);
+    }
+  }
+  activeDrawingTags.clear();
+  if (drawingTagLayer instanceof HTMLElement) {
+    drawingTagLayer.innerHTML = "";
+  }
+}
+
+function positionDrawingTag(el, x, y) {
+  if (!(el instanceof HTMLElement)) return;
+  const px = BOARD_BORDER_PX + BOARD_PADDING_PX + x * CELL_STRIDE_PX + BASE_PIXEL_SIZE / 2;
+  const py = BOARD_BORDER_PX + BOARD_PADDING_PX + y * CELL_STRIDE_PX;
+  el.style.left = `${px}px`;
+  el.style.top = `${py}px`;
+}
+
+function removeDrawingTag(userId) {
+  const key = String(userId || "");
+  if (!key) return;
+  const state = activeDrawingTags.get(key);
+  if (!state) return;
+  if (state.timerId != null) {
+    window.clearTimeout(state.timerId);
+  }
+  activeDrawingTags.delete(key);
+  const el = state.el;
+  if (!(el instanceof HTMLElement)) return;
+  el.classList.add("is-fading");
+  window.setTimeout(() => {
+    if (el.parentElement) el.remove();
+  }, 190);
+}
+
+function showDrawingActivityTag(user, point) {
+  if (!(drawingTagLayer instanceof HTMLElement) || !user || !point) return;
+  const id = String(user.id || "");
+  if (!id || id === String(selfUserId || "")) return;
+  const name = String(user.name || "Artist");
+  const x = Number(point.x);
+  const y = Number(point.y);
+  if (!Number.isInteger(x) || !Number.isInteger(y)) return;
+  const brushColor = normalizeHexColor(point.color) || normalizeHexColor(user.color) || "#94a3b8";
+  const existing = activeDrawingTags.get(id);
+  let el = existing?.el;
+  if (!(el instanceof HTMLElement)) {
+    el = document.createElement("div");
+    el.className = "drawing-tag";
+    el.dataset.userId = id;
+    drawingTagLayer.appendChild(el);
+  } else {
+    el.classList.remove("is-fading");
+  }
+  el.textContent = name;
+  el.style.borderColor = `${brushColor}cc`;
+  el.style.boxShadow = `0 0 0 1px ${brushColor}33, 0 3px 12px rgba(2, 6, 23, 0.45)`;
+  positionDrawingTag(el, x, y);
+  let timerId = existing?.timerId;
+  if (timerId != null) {
+    window.clearTimeout(timerId);
+  }
+  timerId = window.setTimeout(() => {
+    removeDrawingTag(id);
+  }, DRAWING_TAG_MS);
+  activeDrawingTags.set(id, { el, timerId });
+}
+
+function pruneDrawingTagsForUsers(users) {
+  const present = new Set((Array.isArray(users) ? users : []).map((u) => String(u?.id || "")));
+  for (const id of activeDrawingTags.keys()) {
+    if (!present.has(id)) {
+      removeDrawingTag(id);
+    }
+  }
 }
 
 function renderState(state) {
@@ -1262,6 +1352,7 @@ function renderState(state) {
   });
   renderChat(latestState.chat);
   renderUsers(latestState.users);
+  pruneDrawingTagsForUsers(latestState.users);
 }
 
 function connect() {
@@ -1286,6 +1377,7 @@ function connect() {
   wheelZoomAccum = 0;
   pendingRemotePixels.clear();
   releasePaintCapture();
+  clearDrawingActivityTags();
 
   statusText.textContent = "Status: connecting...";
   ws = new WebSocket(wsUrl(selectedRoomId, launchConnectMode, selectedRoomPassword));
@@ -1320,6 +1412,7 @@ function connect() {
       }
       updateRoomUi();
       setLaunchConnectMode(msg.isPublicRoom ? "start" : "join");
+      selfUserId = typeof msg.selfUserId === "string" ? msg.selfUserId : "";
       saveBoardSession();
       updateLaunchRoomHint(`Connected to ${displayRoomLabel(selectedRoomId)}.`, false);
       renderState(msg);
@@ -1344,6 +1437,7 @@ function connect() {
       latestState.users = msg.users || [];
       playersText.textContent = `Artists online: ${latestState.users.length}`;
       renderUsers(latestState.users);
+      pruneDrawingTagsForUsers(latestState.users);
       renderChat(latestState.chat);
       return;
     }
@@ -1361,6 +1455,11 @@ function connect() {
 
     if (msg.type === "pixels-updated" && Array.isArray(msg.pixels)) {
       queueRemotePixels(msg.pixels);
+      return;
+    }
+
+    if (msg.type === "drawing-activity" && msg.user && msg.point) {
+      showDrawingActivityTag(msg.user, msg.point);
       return;
     }
   });
