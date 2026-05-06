@@ -105,18 +105,20 @@
                 <p id="toolText">Tool: Brush</p>
                 <p id="statusText">Status: connecting...</p>
                 <p id="roomText">Room: -</p>
-                <label for="workspaceRoomInput">Switch Room (No Reload)</label>
-                <div class="row">
-                  <input id="workspaceRoomInput" type="text" maxlength="20" value="lobby" />
-                  <input id="workspaceRoomPasswordInput" type="text" maxlength="20" placeholder="Password" />
-                </div>
-                <div class="row workspace-room-actions">
-                  <button id="workspaceJoinRoomBtn" type="button">Join</button>
-                  <button id="workspaceCreateRoomBtn" type="button">Create</button>
-                  <button id="workspaceLobbyBtn" type="button">Lobby</button>
-                </div>
-                <div class="row">
-                  <button id="copyRoomCodeBtn" type="button">Copy Room Password</button>
+                <div class="workspace-room-switch">
+                  <p class="workspace-room-switch-title">ROOM SWITCHER</p>
+                  <div class="row workspace-room-inputs">
+                    <input id="workspaceRoomInput" type="text" maxlength="20" value="lobby" />
+                    <input id="workspaceRoomPasswordInput" type="text" maxlength="20" placeholder="Password" />
+                  </div>
+                  <div class="row workspace-room-actions">
+                    <button id="workspaceJoinRoomBtn" type="button">Join</button>
+                    <button id="workspaceCreateRoomBtn" type="button">Create</button>
+                    <button id="workspaceLobbyBtn" type="button">Lobby</button>
+                  </div>
+                  <div class="row workspace-room-copy-row">
+                    <button id="copyRoomCodeBtn" type="button">Copy Room Password</button>
+                  </div>
                 </div>
                 <p id="playersText">Artists online: 0</p>
               </div>
