@@ -892,8 +892,8 @@ function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
   const nextScrollTop = boardViewport.scrollTop + deltaY;
   const maxLeft = Math.max(0, boardViewport.scrollWidth - boardViewport.clientWidth);
   const maxTop = Math.max(0, boardViewport.scrollHeight - boardViewport.clientHeight);
-  boardViewport.scrollLeft = clamp(nextScrollLeft, 0, maxLeft);
-  boardViewport.scrollTop = clamp(nextScrollTop, 0, maxTop);
+  boardViewport.scrollLeft = edgeGuardedScrollTarget(boardViewport.scrollLeft, nextScrollLeft, maxLeft);
+  boardViewport.scrollTop = edgeGuardedScrollTarget(boardViewport.scrollTop, nextScrollTop, maxTop);
 }
 
 function applyZoomKeepingLocalPoint(nextZoom, localX, localY, anchorClientX, anchorClientY) {
@@ -924,8 +924,8 @@ function applyZoomKeepingLocalPoint(nextZoom, localX, localY, anchorClientX, anc
   const nextScrollTop = localY * clamped - pivotRelY;
   const maxLeft = Math.max(0, boardViewport.scrollWidth - boardViewport.clientWidth);
   const maxTop = Math.max(0, boardViewport.scrollHeight - boardViewport.clientHeight);
-  boardViewport.scrollLeft = clamp(nextScrollLeft, 0, maxLeft);
-  boardViewport.scrollTop = clamp(nextScrollTop, 0, maxTop);
+  boardViewport.scrollLeft = edgeGuardedScrollTarget(boardViewport.scrollLeft, nextScrollLeft, maxLeft);
+  boardViewport.scrollTop = edgeGuardedScrollTarget(boardViewport.scrollTop, nextScrollTop, maxTop);
 }
 
 function shouldStartPanning(event) {
@@ -946,6 +946,19 @@ function startPanning(event) {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function edgeGuardedScrollTarget(current, target, max) {
+  if (!(max > 0)) return 0;
+  const clamped = clamp(target, 0, max);
+  const nearMin = current <= ZOOM_EDGE_GUARD_PX;
+  const nearMax = current >= max - ZOOM_EDGE_GUARD_PX;
+  const wantsPastMin = target < 0;
+  const wantsPastMax = target > max;
+  if ((nearMin && wantsPastMin) || (nearMax && wantsPastMax)) {
+    return current;
+  }
+  return clamped;
 }
 
 function syncToolboxButtons() {
@@ -1058,6 +1071,7 @@ const TWO_FINGER_TAP_MAX_MOVE_PX = 36;
 const TWO_FINGER_PAN_CANCEL_PX = 14;
 const TWO_FINGER_DOUBLE_TAP_MS = 650;
 const THREE_FINGER_DOUBLE_TAP_MS = 650;
+const ZOOM_EDGE_GUARD_PX = 10;
 
 function isMobileWorkspaceDockMode() {
   return window.matchMedia("(max-width: 700px)").matches;
