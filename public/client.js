@@ -112,6 +112,7 @@ let roomPresencePollTimer = null;
 let manualRoomSwitchInProgress = false;
 let recentColors = [];
 let pencilDrawingMode = false;
+let colorPickerOpen = false;
 let selfUserId = "";
 const activeDrawingTags = new Map();
 const DRAWING_TAG_MS = 1300;
@@ -639,6 +640,40 @@ function shouldHandleCanvasShortcut(event) {
   if (!(target instanceof HTMLElement)) return true;
   const tag = target.tagName;
   return tag !== "INPUT" && tag !== "TEXTAREA" && !target.isContentEditable;
+}
+
+function openColorPicker() {
+  if (!(colorInput instanceof HTMLInputElement)) return;
+  colorPickerOpen = true;
+  colorInput.focus({ preventScroll: true });
+  if (typeof colorInput.showPicker === "function") {
+    try {
+      colorInput.showPicker();
+      return;
+    } catch {
+      // Fall back to click if showPicker is blocked.
+    }
+  }
+  colorInput.click();
+}
+
+function closeColorPicker() {
+  colorPickerOpen = false;
+  if (colorInput instanceof HTMLInputElement) {
+    try {
+      colorInput.blur();
+    } catch {
+      // Ignore blur failures.
+    }
+  }
+}
+
+function toggleColorPicker() {
+  if (colorPickerOpen) {
+    closeColorPicker();
+    return;
+  }
+  openColorPicker();
 }
 
 function isShortcutHelpOpen() {
@@ -2011,7 +2046,26 @@ colorInput.addEventListener("change", () => {
     toolText.textContent = "Tool: Brush";
   }
   addColorToHistory(colorInput.value);
+  colorPickerOpen = false;
 });
+
+colorInput.addEventListener("focus", () => {
+  colorPickerOpen = true;
+});
+
+colorInput.addEventListener("blur", () => {
+  colorPickerOpen = false;
+});
+
+colorInput.addEventListener(
+  "pointerdown",
+  (event) => {
+    if (!colorPickerOpen) return;
+    event.preventDefault();
+    closeColorPicker();
+  },
+  { passive: false }
+);
 
 function wheelZoomStep(event) {
   let delta = event.deltaY;
@@ -2321,8 +2375,7 @@ window.addEventListener("keydown", (event) => {
       eraserBtn.textContent = "Eraser: Off";
       toolText.textContent = "Tool: Brush";
     }
-    colorInput.focus({ preventScroll: true });
-    colorInput.click();
+    toggleColorPicker();
     return;
   }
   if (!event.ctrlKey && !event.metaKey && !event.altKey && key === "e") {
