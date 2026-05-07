@@ -347,8 +347,11 @@ function openLaunchOverlayFromWorkspace(mode = "join") {
       : "Select available room, then press JOIN ROOM.",
     false
   );
-  void refreshRoomPresence();
+  // Let modal paint first, then refresh room presence to keep open snappy.
   startRoomPresencePolling();
+  window.requestAnimationFrame(() => {
+    void refreshRoomPresence();
+  });
   if (launchRoomInput instanceof HTMLInputElement && overlayMode === "create") {
     launchRoomInput.focus({ preventScroll: true });
     launchRoomInput.select();
@@ -2687,6 +2690,17 @@ if (workspaceRoomPasswordInput instanceof HTMLInputElement) {
 }
 
 if (launchGate instanceof HTMLElement) {
+  launchGate.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (!hasEnteredBoard) return;
+      if (!launchGate.classList.contains("workspace-modal")) return;
+      if (event.target !== launchGate) return;
+      event.preventDefault();
+      closeLaunchOverlay();
+    },
+    { passive: false }
+  );
   launchGate.addEventListener("click", (event) => {
     if (!hasEnteredBoard) return;
     if (!launchGate.classList.contains("workspace-modal")) return;
