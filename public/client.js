@@ -120,6 +120,7 @@ let colorPickerOpen = false;
 let selfUserId = "";
 const activeDrawingTags = new Map();
 const DRAWING_TAG_MS = 1300;
+let boardViewportBounds = null;
 
 /** Stable id for paint ownership across page refresh (server `ownerKey`). */
 function getOrCreateClientKey() {
@@ -181,6 +182,20 @@ function setSelectedRoom(roomId) {
     launchRoomInput.value = displayRoomLabel(roomId);
   }
   updateRoomUi();
+}
+
+function refreshBoardViewportBounds() {
+  if (!(boardViewport instanceof HTMLElement)) {
+    boardViewportBounds = null;
+    return;
+  }
+  const r = boardViewport.getBoundingClientRect();
+  boardViewportBounds = {
+    left: r.left + boardViewport.clientLeft,
+    top: r.top + boardViewport.clientTop,
+    right: r.right - boardViewport.clientLeft,
+    bottom: r.bottom - boardViewport.clientTop,
+  };
 }
 
 function updateRoomUi() {
@@ -787,6 +802,7 @@ function createBoard(state) {
   drawingTagLayer.className = "drawing-tag-layer";
   drawingTagLayer.setAttribute("aria-hidden", "true");
   board.appendChild(drawingTagLayer);
+  refreshBoardViewportBounds();
 }
 
 function applyPixel(x, y, color) {
@@ -800,8 +816,16 @@ function applyPixel(x, y, color) {
 
 function clientIsOverBoardViewport(clientX, clientY) {
   if (!(boardViewport instanceof HTMLElement)) return false;
-  const r = boardViewport.getBoundingClientRect();
-  return clientX >= r.left && clientX < r.right && clientY >= r.top && clientY < r.bottom;
+  if (!boardViewportBounds) {
+    refreshBoardViewportBounds();
+  }
+  if (!boardViewportBounds) return false;
+  return (
+    clientX >= boardViewportBounds.left &&
+    clientX < boardViewportBounds.right &&
+    clientY >= boardViewportBounds.top &&
+    clientY < boardViewportBounds.bottom
+  );
 }
 
 function pickCellFromPoint(clientX, clientY) {
@@ -961,7 +985,6 @@ function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
   updateZoomSliderVisual();
   zoomText.textContent = `Zoom: ${Math.round(clamped * 100)}%`;
   board.style.transform = `scale(${zoomLevel})`;
-  void board.offsetWidth;
 
   const nextScrollLeft = localX * clamped - pivotRelX;
   const nextScrollTop = localY * clamped - pivotRelY;
@@ -993,7 +1016,6 @@ function applyZoomKeepingLocalPoint(nextZoom, localX, localY, anchorClientX, anc
   updateZoomSliderVisual();
   zoomText.textContent = `Zoom: ${Math.round(clamped * 100)}%`;
   board.style.transform = `scale(${zoomLevel})`;
-  void board.offsetWidth;
 
   const nextScrollLeft = localX * clamped - pivotRelX;
   const nextScrollTop = localY * clamped - pivotRelY;
@@ -1488,6 +1510,8 @@ function renderChat(chat) {
     const author = document.createElement("span");
     author.className = "chat-author";
     author.textContent = `${entry.author}:`;
+    author.dataset.authorId = String(entry.authorId || "");
+    author.dataset.authorName = String(entry.author || "");
     const authorColor =
       colorById.get(String(entry.authorId || "")) || colorByName.get(String(entry.author || ""));
     if (authorColor) {
@@ -1503,6 +1527,19 @@ function renderChat(chat) {
     chatBox.appendChild(line);
   });
   chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function refreshChatAuthorColors(users) {
+  const source = Array.isArray(users) ? users : [];
+  const colorById = new Map(source.map((user) => [String(user.id || ""), String(user.color || "#e2e8f0")]));
+  const colorByName = new Map(source.map((user) => [String(user.name || ""), String(user.color || "#e2e8f0")]));
+  const authors = chatBox.querySelectorAll(".chat-author");
+  for (const author of authors) {
+    if (!(author instanceof HTMLElement)) continue;
+    const authorId = String(author.dataset.authorId || "");
+    const authorName = String(author.dataset.authorName || "");
+    author.style.color = colorById.get(authorId) || colorByName.get(authorName) || "#e2e8f0";
+  }
 }
 
 function renderUsers(users) {
@@ -1707,7 +1744,7 @@ function connect() {
       playersText.textContent = `Artists online: ${latestState.users.length}`;
       renderUsers(latestState.users);
       pruneDrawingTagsForUsers(latestState.users);
-      renderChat(latestState.chat);
+      refreshChatAuthorColors(latestState.users);
       return;
     }
 
@@ -2301,19 +2338,7 @@ if (boardViewport instanceof HTMLElement) {
     { passive: false }
   );
   boardViewport.addEventListener("pointermove", (event) => {
-    const r = boardViewport.getBoundingClientRect();
-    const il = r.left + boardViewport.clientLeft;
-    const it = r.top + boardViewport.clientTop;
-    const iw = boardViewport.clientWidth;
-    const ih = boardViewport.clientHeight;
-    if (
-      event.clientX >= il &&
-      event.clientX < il + iw &&
-      event.clientY >= it &&
-      event.clientY < it + ih
-    ) {
-      boardZoomAnchorClient = { x: event.clientX, y: event.clientY };
-    }
+    boardZoomAnchorClient = { x: event.clientX, y: event.clientY };
   });
 
   boardViewport.addEventListener(
@@ -2506,6 +2531,7 @@ window.addEventListener("keyup", (event) => {
 
 renderState(latestState);
 setZoom(0.9);
+refreshBoardViewportBounds();
 syncToolboxButtons();
 syncWorkspaceCollapseButton();
 loadColorHistory();
@@ -2744,6 +2770,7 @@ if (launchGate instanceof HTMLElement) {
 }
 
 window.addEventListener("resize", () => {
+  refreshBoardViewportBounds();
   if (boardZoomAnchorClient) {
     setZoom(zoomLevel, boardZoomAnchorClient.x, boardZoomAnchorClient.y);
   } else {
