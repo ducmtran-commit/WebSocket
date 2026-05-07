@@ -73,6 +73,8 @@ const MIN_ZOOM = 0.7;
 const DESKTOP_MAX_ZOOM = 2.2;
 const MOBILE_MAX_ZOOM = 2.2;
 let zoomLevel = 1;
+/** Last pointer position over board viewport for anchored zoom controls. */
+let boardZoomAnchorClient = null;
 let cellEls = [];
 const pendingPixels = new Map();
 let flushTimer = null;
@@ -868,7 +870,7 @@ function updateZoomSliderVisual() {
 }
 
 function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
-  const prevZoom = zoomLevel;
+  const prevZoom = Math.max(1e-6, zoomLevel);
   const minZoom = getEffectiveMinZoom();
   const maxZoom = getEffectiveMaxZoom();
   zoomInput.min = String(minZoom);
@@ -883,50 +885,36 @@ function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
   const innerTop = viewportRect.top + boardViewport.clientTop;
   const innerRight = innerLeft + viewW;
   const innerBottom = innerTop + viewH;
-
   const hasAnchor =
     typeof anchorClientX === "number" &&
     Number.isFinite(anchorClientX) &&
     typeof anchorClientY === "number" &&
     Number.isFinite(anchorClientY);
 
-  const beforeRect = board.getBoundingClientRect();
-  let pivotX = hasAnchor
+  const pivotX = hasAnchor
     ? clamp(anchorClientX, innerLeft, Math.max(innerLeft, innerRight - 1e-6))
     : innerLeft + viewW / 2;
-  let pivotY = hasAnchor
+  const pivotY = hasAnchor
     ? clamp(anchorClientY, innerTop, Math.max(innerTop, innerBottom - 1e-6))
     : innerTop + viewH / 2;
-  // Keep zoom anchor within board bounds to avoid high-zoom jumps
-  // when the cursor is near/outside the rendered board area.
-  if (hasAnchor) {
-    pivotX = clamp(pivotX, beforeRect.left, Math.max(beforeRect.left, beforeRect.right - 1e-6));
-    pivotY = clamp(pivotY, beforeRect.top, Math.max(beforeRect.top, beforeRect.bottom - 1e-6));
-  }
-  const beforeW = Math.max(1e-6, beforeRect.width);
-  const beforeH = Math.max(1e-6, beforeRect.height);
-  const u = clamp((pivotX - beforeRect.left) / beforeW, 0, 1);
-  const v = clamp((pivotY - beforeRect.top) / beforeH, 0, 1);
+  const pivotRelX = pivotX - innerLeft;
+  const pivotRelY = pivotY - innerTop;
+  const localX = (boardViewport.scrollLeft + pivotRelX) / prevZoom;
+  const localY = (boardViewport.scrollTop + pivotRelY) / prevZoom;
 
   zoomLevel = clamped;
   zoomInput.value = String(clamped);
   updateZoomSliderVisual();
   zoomText.textContent = `Zoom: ${Math.round(clamped * 100)}%`;
   board.style.transform = `scale(${zoomLevel})`;
-
   void board.offsetWidth;
-  const afterRect = board.getBoundingClientRect();
-  const targetX = afterRect.left + u * afterRect.width;
-  const targetY = afterRect.top + v * afterRect.height;
-  const deltaX = targetX - pivotX;
-  const deltaY = targetY - pivotY;
 
-  const nextScrollLeft = boardViewport.scrollLeft + deltaX;
-  const nextScrollTop = boardViewport.scrollTop + deltaY;
+  const nextScrollLeft = localX * clamped - pivotRelX;
+  const nextScrollTop = localY * clamped - pivotRelY;
   const maxLeft = Math.max(0, boardViewport.scrollWidth - boardViewport.clientWidth);
   const maxTop = Math.max(0, boardViewport.scrollHeight - boardViewport.clientHeight);
-  boardViewport.scrollLeft = edgeGuardedScrollTarget(boardViewport.scrollLeft, nextScrollLeft, maxLeft);
-  boardViewport.scrollTop = edgeGuardedScrollTarget(boardViewport.scrollTop, nextScrollTop, maxTop);
+  boardViewport.scrollLeft = clamp(nextScrollLeft, 0, maxLeft);
+  boardViewport.scrollTop = clamp(nextScrollTop, 0, maxTop);
 }
 
 function applyZoomKeepingLocalPoint(nextZoom, localX, localY, anchorClientX, anchorClientY) {
@@ -957,8 +945,8 @@ function applyZoomKeepingLocalPoint(nextZoom, localX, localY, anchorClientX, anc
   const nextScrollTop = localY * clamped - pivotRelY;
   const maxLeft = Math.max(0, boardViewport.scrollWidth - boardViewport.clientWidth);
   const maxTop = Math.max(0, boardViewport.scrollHeight - boardViewport.clientHeight);
-  boardViewport.scrollLeft = edgeGuardedScrollTarget(boardViewport.scrollLeft, nextScrollLeft, maxLeft);
-  boardViewport.scrollTop = edgeGuardedScrollTarget(boardViewport.scrollTop, nextScrollTop, maxTop);
+  boardViewport.scrollLeft = clamp(nextScrollLeft, 0, maxLeft);
+  boardViewport.scrollTop = clamp(nextScrollTop, 0, maxTop);
 }
 
 function shouldStartPanning(event) {
@@ -2027,15 +2015,27 @@ if (pencilModeBtn instanceof HTMLButtonElement) {
 }
 
 zoomInput.addEventListener("input", () => {
-  setZoom(zoomInput.value);
+  if (boardZoomAnchorClient) {
+    setZoom(zoomInput.value, boardZoomAnchorClient.x, boardZoomAnchorClient.y);
+  } else {
+    setZoom(zoomInput.value);
+  }
 });
 
 zoomOutBtn.addEventListener("click", () => {
-  setZoom(zoomLevel - 0.05);
+  if (boardZoomAnchorClient) {
+    setZoom(zoomLevel - 0.05, boardZoomAnchorClient.x, boardZoomAnchorClient.y);
+  } else {
+    setZoom(zoomLevel - 0.05);
+  }
 });
 
 zoomInBtn.addEventListener("click", () => {
-  setZoom(zoomLevel + 0.05);
+  if (boardZoomAnchorClient) {
+    setZoom(zoomLevel + 0.05, boardZoomAnchorClient.x, boardZoomAnchorClient.y);
+  } else {
+    setZoom(zoomLevel + 0.05);
+  }
 });
 
 colorInput.addEventListener("change", () => {
@@ -2081,13 +2081,16 @@ function wheelZoomStep(event) {
 /** One zoom apply per frame; keeps cursor-anchored math from fighting rapid wheel bursts. */
 let wheelZoomAccum = 0;
 let wheelZoomRaf = null;
+let wheelZoomClientX = 0;
+let wheelZoomClientY = 0;
 
 function flushWheelZoomFrame() {
   wheelZoomRaf = null;
   if (wheelZoomAccum === 0) return;
   const step = clamp(wheelZoomAccum, -0.2, 0.2);
   wheelZoomAccum = 0;
-  setZoom(zoomLevel + step);
+  boardZoomAnchorClient = { x: wheelZoomClientX, y: wheelZoomClientY };
+  setZoom(zoomLevel + step, wheelZoomClientX, wheelZoomClientY);
 }
 
 function touchDistance(a, b) {
@@ -2225,6 +2228,8 @@ if (boardViewport instanceof HTMLElement) {
       event.stopPropagation();
       const step = wheelZoomStep(event);
       if (step === 0) return;
+      wheelZoomClientX = event.clientX;
+      wheelZoomClientY = event.clientY;
       wheelZoomAccum += step;
       if (wheelZoomRaf == null) {
         wheelZoomRaf = requestAnimationFrame(flushWheelZoomFrame);
@@ -2232,6 +2237,21 @@ if (boardViewport instanceof HTMLElement) {
     },
     { passive: false }
   );
+  boardViewport.addEventListener("pointermove", (event) => {
+    const r = boardViewport.getBoundingClientRect();
+    const il = r.left + boardViewport.clientLeft;
+    const it = r.top + boardViewport.clientTop;
+    const iw = boardViewport.clientWidth;
+    const ih = boardViewport.clientHeight;
+    if (
+      event.clientX >= il &&
+      event.clientX < il + iw &&
+      event.clientY >= it &&
+      event.clientY < it + ih
+    ) {
+      boardZoomAnchorClient = { x: event.clientX, y: event.clientY };
+    }
+  });
 
   boardViewport.addEventListener(
     "touchend",
@@ -2643,5 +2663,9 @@ if (launchGate instanceof HTMLElement) {
 }
 
 window.addEventListener("resize", () => {
-  setZoom(zoomLevel);
+  if (boardZoomAnchorClient) {
+    setZoom(zoomLevel, boardZoomAnchorClient.x, boardZoomAnchorClient.y);
+  } else {
+    setZoom(zoomLevel);
+  }
 });
