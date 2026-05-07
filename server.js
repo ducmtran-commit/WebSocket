@@ -9,11 +9,19 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 const PORT = process.env.PORT || 3000;
 
+function readEnvNumber(name, fallback) {
+  const raw = process.env[name];
+  if (raw == null || raw === "") return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 const DATA_DIR = path.join(__dirname, "data");
 const ROOMS_DIR = path.join(DATA_DIR, "rooms");
-const RETENTION_MS = Math.max(72, Number(process.env.BOARD_RETENTION_HOURS || 72)) * 60 * 60 * 1000;
-const PUBLIC_IDLE_WIPE_MS = Math.max(4320, Number(process.env.BOARD_IDLE_WIPE_MINUTES || 4320)) * 60 * 1000;
-const PRIVATE_IDLE_DELETE_MS = Math.max(1, Number(process.env.PRIVATE_ROOM_IDLE_DELETE_MINUTES || 60)) * 60 * 1000;
+const RETENTION_MS = Math.max(72, readEnvNumber("BOARD_RETENTION_HOURS", 72)) * 60 * 60 * 1000;
+const PUBLIC_IDLE_WIPE_MS = Math.max(4320, readEnvNumber("BOARD_IDLE_WIPE_MINUTES", 4320)) * 60 * 1000;
+const PRIVATE_IDLE_DELETE_MS =
+  Math.max(1, readEnvNumber("PRIVATE_ROOM_IDLE_DELETE_MINUTES", 60)) * 60 * 1000;
 const SAVE_DEBOUNCE_MS = Math.max(3000, Number(process.env.BOARD_SAVE_DEBOUNCE_MS || 12000));
 const PAINT_BROADCAST_MERGE_MS = Math.max(4, Number(process.env.PAINT_BROADCAST_MERGE_MS || 8));
 const MAX_ROOMS = Math.max(1, Number(process.env.MAX_ROOMS || 5));
@@ -146,6 +154,13 @@ function performIdleWipe(roomId) {
   if (!room) return;
   room.idleWipeTimer = null;
   if (roomHasConnectedUsers(room)) return;
+  const idleMs = room.isPublic ? PUBLIC_IDLE_WIPE_MS : PRIVATE_IDLE_DELETE_MS;
+  const elapsedMs = Date.now() - Number(room.lastActivityAt || 0);
+  if (elapsedMs < idleMs) {
+    // Guard against stale/short timers from transient config/process mismatches.
+    scheduleIdleWipeIfEmpty(roomId);
+    return;
+  }
   if (room.isPublic) {
     resetRoomToEmpty(room);
     room.lastActivityAt = Date.now();
@@ -173,6 +188,9 @@ function scheduleIdleWipeIfEmpty(roomId) {
   if (roomHasConnectedUsers(room)) return;
   cancelIdleWipe(room);
   const idleMs = room.isPublic ? PUBLIC_IDLE_WIPE_MS : PRIVATE_IDLE_DELETE_MS;
+  console.log(
+    `${formatRoomLabel(roomId)} idle timer scheduled for ${Math.round(idleMs / 60000)}m (users=${room.users.size}).`
+  );
   room.idleWipeTimer = setTimeout(() => {
     performIdleWipe(roomId);
   }, idleMs);
