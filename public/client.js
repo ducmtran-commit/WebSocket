@@ -559,35 +559,53 @@ function setEnterOriginFromClick(sourceEvent) {
   document.body.style.setProperty("--enter-origin-y", "50vh");
 }
 
-function enterBoardExperience(sourceEvent = null) {
+function enterBoardExperience(sourceEvent = null, options = {}) {
   if (hasEnteredBoard) return;
+  const instantResume = options?.instant === true;
   hasEnteredBoard = true;
   saveBoardSession();
   stopRoomPresencePolling();
-  setEnterOriginFromClick(sourceEvent);
-  playLaunchPixelSound();
-  if (document.body instanceof HTMLElement) {
-    document.body.classList.remove("app-gated");
-    document.body.classList.add("entering-canvas");
-  }
-  if (launchGate instanceof HTMLElement) {
-    clearLaunchGateHideTimer();
-    launchGate.classList.remove("workspace-modal");
-    launchGate.classList.add("is-entering");
-    launchGateHideTimer = window.setTimeout(() => {
+  if (instantResume) {
+    if (document.body instanceof HTMLElement) {
+      document.body.classList.remove("app-gated");
+      document.body.classList.remove("entering-canvas");
+    }
+    if (launchGate instanceof HTMLElement) {
+      clearLaunchGateHideTimer();
+      launchGate.classList.remove("workspace-modal");
+      launchGate.classList.remove("workspace-modal-opening");
+      launchGate.classList.remove("workspace-modal-closing");
       launchGate.classList.remove("is-entering");
       launchGate.classList.add("hidden");
-      launchGateHideTimer = null;
-    }, LAUNCH_ENTER_ANIM_MS);
+    }
+  } else {
+    setEnterOriginFromClick(sourceEvent);
+    playLaunchPixelSound();
+    if (document.body instanceof HTMLElement) {
+      document.body.classList.remove("app-gated");
+      document.body.classList.add("entering-canvas");
+    }
+    if (launchGate instanceof HTMLElement) {
+      clearLaunchGateHideTimer();
+      launchGate.classList.remove("workspace-modal");
+      launchGate.classList.add("is-entering");
+      launchGateHideTimer = window.setTimeout(() => {
+        launchGate.classList.remove("is-entering");
+        launchGate.classList.add("hidden");
+        launchGateHideTimer = null;
+      }, LAUNCH_ENTER_ANIM_MS);
+    }
   }
   if (document.activeElement instanceof HTMLElement) {
     document.activeElement.blur();
   }
-  window.setTimeout(() => {
-    if (document.body instanceof HTMLElement) {
-      document.body.classList.remove("entering-canvas");
-    }
-  }, LAUNCH_ENTER_ANIM_MS);
+  if (!instantResume) {
+    window.setTimeout(() => {
+      if (document.body instanceof HTMLElement) {
+        document.body.classList.remove("entering-canvas");
+      }
+    }, LAUNCH_ENTER_ANIM_MS);
+  }
   if (statusText instanceof HTMLElement) {
     statusText.textContent = "Status: connecting...";
   }
@@ -2555,7 +2573,7 @@ if (lastSession) {
   setLaunchConnectMode(lastSession.mode);
   updateRoomUi();
   updateLaunchRoomHint(`Resuming ${displayRoomLabel(lastSession.roomId)}...`, false);
-  enterBoardExperience();
+  enterBoardExperience(null, { instant: true });
 } else {
   setLaunchConnectMode("start");
   updateLaunchRoomHint(`Up to ${maxRoomCount} rooms total, ${maxUsersPerRoom} users each.`, false);
