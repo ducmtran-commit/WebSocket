@@ -16,7 +16,10 @@ function readEnvNumber(name, fallback) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-const DATA_DIR = path.join(__dirname, "data");
+const DATA_DIR =
+  typeof process.env.BOARD_DATA_DIR === "string" && process.env.BOARD_DATA_DIR.trim()
+    ? process.env.BOARD_DATA_DIR.trim()
+    : path.join(__dirname, "data");
 const ROOMS_DIR = path.join(DATA_DIR, "rooms");
 const RETENTION_MS = Math.max(72, readEnvNumber("BOARD_RETENTION_HOURS", 72)) * 60 * 60 * 1000;
 const PUBLIC_IDLE_WIPE_MS = Math.max(4320, readEnvNumber("BOARD_IDLE_WIPE_MINUTES", 4320)) * 60 * 1000;
