@@ -902,10 +902,21 @@ button {
 }
 
 #pencilModeBtn {
-  width: 100%;
+  width: auto;
+  min-width: 128px;
   border-color: #3e5b88;
   background: #162641;
   font-weight: 700;
+}
+
+.brush-controls-row {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.brush-controls-row #colorInput {
+  flex: 1 1 160px;
+  min-width: 140px;
 }
 
 button {
