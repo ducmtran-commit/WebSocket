@@ -93,7 +93,9 @@ let workspaceHidden = false;
 let workspaceHideTimer = null;
 let hasEnteredBoard = false;
 const LAUNCH_ENTER_ANIM_MS = 760;
+const WORKSPACE_MODAL_FADE_MS = 150;
 let launchGateHideTimer = null;
+let workspaceModalCloseTimer = null;
 let sectionReorder = null;
 const SECTION_REORDER_SLOT_UNSET = Symbol("sectionReorderSlot");
 /** Last drop target for placeholder; avoids repeat `insertBefore` / `appendChild` every mousemove. */
@@ -306,15 +308,37 @@ function clearLaunchGateHideTimer() {
   launchGateHideTimer = null;
 }
 
+function clearWorkspaceModalCloseTimer() {
+  if (workspaceModalCloseTimer == null) return;
+  window.clearTimeout(workspaceModalCloseTimer);
+  workspaceModalCloseTimer = null;
+}
+
 function isLaunchGateVisible() {
   return launchGate instanceof HTMLElement && !launchGate.classList.contains("hidden");
 }
 
 function closeLaunchOverlay() {
   if (!(launchGate instanceof HTMLElement)) return;
+  clearWorkspaceModalCloseTimer();
   clearLaunchGateHideTimer();
-  launchGate.classList.remove("workspace-modal");
+  launchGate.classList.remove("workspace-modal-opening");
   launchGate.classList.remove("is-entering");
+  if (launchGate.classList.contains("workspace-modal")) {
+    launchGate.classList.add("workspace-modal-closing");
+    if (hasEnteredBoard) {
+      stopRoomPresencePolling();
+    }
+    workspaceModalCloseTimer = window.setTimeout(() => {
+      if (!(launchGate instanceof HTMLElement)) return;
+      launchGate.classList.remove("workspace-modal-closing");
+      launchGate.classList.remove("workspace-modal");
+      launchGate.classList.add("hidden");
+      workspaceModalCloseTimer = null;
+    }, WORKSPACE_MODAL_FADE_MS);
+    return;
+  }
+  launchGate.classList.remove("workspace-modal-closing");
   launchGate.classList.add("hidden");
   if (hasEnteredBoard) {
     stopRoomPresencePolling();
@@ -323,6 +347,7 @@ function closeLaunchOverlay() {
 
 function openLaunchOverlayFromWorkspace(mode = "join") {
   if (!(launchGate instanceof HTMLElement)) return;
+  clearWorkspaceModalCloseTimer();
   clearLaunchGateHideTimer();
   const overlayMode = mode === "create" ? "create" : "join";
   const roomRaw = workspaceRoomInput instanceof HTMLInputElement ? workspaceRoomInput.value : "";
@@ -335,7 +360,13 @@ function openLaunchOverlayFromWorkspace(mode = "join") {
   updateRoomUi();
   launchGate.classList.remove("hidden");
   launchGate.classList.remove("is-entering");
+  launchGate.classList.remove("workspace-modal-closing");
   launchGate.classList.add("workspace-modal");
+  launchGate.classList.add("workspace-modal-opening");
+  window.requestAnimationFrame(() => {
+    if (!(launchGate instanceof HTMLElement)) return;
+    launchGate.classList.remove("workspace-modal-opening");
+  });
   if (document.body instanceof HTMLElement) {
     document.body.classList.remove("app-gated");
     document.body.classList.remove("entering-canvas");
@@ -375,7 +406,10 @@ function returnToLaunchScreen() {
     }
   }
   if (launchGate instanceof HTMLElement) {
+    clearWorkspaceModalCloseTimer();
     clearLaunchGateHideTimer();
+    launchGate.classList.remove("workspace-modal-opening");
+    launchGate.classList.remove("workspace-modal-closing");
     launchGate.classList.remove("workspace-modal");
     launchGate.classList.remove("hidden");
     launchGate.classList.remove("is-entering");
