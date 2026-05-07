@@ -910,7 +910,7 @@ button {
 }
 
 .brush-controls-row {
-  align-items: center;
+  align-items: stretch;
   flex-wrap: nowrap;
   gap: 4px;
 }
@@ -930,8 +930,16 @@ button {
 .brush-controls-row #pencilModeBtn {
   flex: 1 1 0;
   min-width: 0;
-  height: 38px;
+  min-height: 44px;
+  height: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.1;
   font-size: 0.9rem;
+  padding: 5px 8px;
 }
 
 .brush-controls-row #colorInput::-webkit-color-swatch-wrapper {
