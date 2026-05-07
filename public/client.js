@@ -965,6 +965,17 @@ function updateZoomSliderVisual() {
   zoomInput.style.setProperty("--range-fill", `${percent}%`);
 }
 
+function syncBoardZoomScrollFootprint() {
+  if (!(board instanceof HTMLElement)) return;
+  const baseWidth = board.offsetWidth;
+  const baseHeight = board.offsetHeight;
+  const extraWidth = Math.max(0, Math.round(baseWidth * (zoomLevel - 1)));
+  const extraHeight = Math.max(0, Math.round(baseHeight * (zoomLevel - 1)));
+  // `transform: scale()` does not expand scrollWidth/scrollHeight; margins do.
+  board.style.marginRight = `${extraWidth}px`;
+  board.style.marginBottom = `${extraHeight}px`;
+}
+
 function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
   const prevZoom = Math.max(1e-6, zoomLevel);
   const minZoom = getEffectiveMinZoom();
@@ -1003,8 +1014,7 @@ function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
   updateZoomSliderVisual();
   zoomText.textContent = `Zoom: ${Math.round(clamped * 100)}%`;
   board.style.transform = `scale(${zoomLevel})`;
-  // Keep scroll metrics in sync after transform updates.
-  void board.offsetWidth;
+  syncBoardZoomScrollFootprint();
 
   const nextScrollLeft = localX * clamped - pivotRelX;
   const nextScrollTop = localY * clamped - pivotRelY;
@@ -1036,8 +1046,7 @@ function applyZoomKeepingLocalPoint(nextZoom, localX, localY, anchorClientX, anc
   updateZoomSliderVisual();
   zoomText.textContent = `Zoom: ${Math.round(clamped * 100)}%`;
   board.style.transform = `scale(${zoomLevel})`;
-  // Keep scroll metrics in sync after transform updates.
-  void board.offsetWidth;
+  syncBoardZoomScrollFootprint();
 
   const nextScrollLeft = localX * clamped - pivotRelX;
   const nextScrollTop = localY * clamped - pivotRelY;
@@ -2557,6 +2566,7 @@ window.addEventListener("keyup", (event) => {
 
 renderState(latestState);
 setZoom(0.9);
+syncBoardZoomScrollFootprint();
 refreshBoardViewportBounds();
 syncToolboxButtons();
 syncWorkspaceCollapseButton();
