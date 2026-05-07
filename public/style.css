@@ -911,12 +911,23 @@ button {
 
 .brush-controls-row {
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  gap: 4px;
 }
 
 .brush-controls-row #colorInput {
-  flex: 1 1 160px;
-  min-width: 140px;
+  flex: 0 0 44px;
+  min-width: 44px;
+  height: 34px;
+  padding: 0;
+}
+
+.brush-controls-row #eraserBtn,
+.brush-controls-row #clearBtn,
+.brush-controls-row #pencilModeBtn {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 0.9rem;
 }
 
 button {
@@ -1192,6 +1203,10 @@ input {
 
   .workspace-room-actions button {
     min-width: 0;
+  }
+
+  .brush-controls-row {
+    flex-wrap: wrap;
   }
 
   .workspace-panel.auto-hidden {
