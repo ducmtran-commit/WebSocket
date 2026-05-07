@@ -73,8 +73,6 @@ const MIN_ZOOM = 0.7;
 const DESKTOP_MAX_ZOOM = 2.2;
 const MOBILE_MAX_ZOOM = 2.2;
 let zoomLevel = 1;
-/** Last pointer position over the board viewport (for zoom +/- / slider to zoom toward cursor). */
-let boardZoomAnchorClient = null;
 let cellEls = [];
 const pendingPixels = new Map();
 let flushTimer = null;
@@ -1994,27 +1992,15 @@ if (pencilModeBtn instanceof HTMLButtonElement) {
 }
 
 zoomInput.addEventListener("input", () => {
-  if (boardZoomAnchorClient) {
-    setZoom(zoomInput.value, boardZoomAnchorClient.x, boardZoomAnchorClient.y);
-  } else {
-    setZoom(zoomInput.value);
-  }
+  setZoom(zoomInput.value);
 });
 
 zoomOutBtn.addEventListener("click", () => {
-  if (boardZoomAnchorClient) {
-    setZoom(zoomLevel - 0.05, boardZoomAnchorClient.x, boardZoomAnchorClient.y);
-  } else {
-    setZoom(zoomLevel - 0.05);
-  }
+  setZoom(zoomLevel - 0.05);
 });
 
 zoomInBtn.addEventListener("click", () => {
-  if (boardZoomAnchorClient) {
-    setZoom(zoomLevel + 0.05, boardZoomAnchorClient.x, boardZoomAnchorClient.y);
-  } else {
-    setZoom(zoomLevel + 0.05);
-  }
+  setZoom(zoomLevel + 0.05);
 });
 
 colorInput.addEventListener("change", () => {
@@ -2041,16 +2027,13 @@ function wheelZoomStep(event) {
 /** One zoom apply per frame; keeps cursor-anchored math from fighting rapid wheel bursts. */
 let wheelZoomAccum = 0;
 let wheelZoomRaf = null;
-let wheelZoomClientX = 0;
-let wheelZoomClientY = 0;
 
 function flushWheelZoomFrame() {
   wheelZoomRaf = null;
   if (wheelZoomAccum === 0) return;
   const step = clamp(wheelZoomAccum, -0.2, 0.2);
   wheelZoomAccum = 0;
-  boardZoomAnchorClient = { x: wheelZoomClientX, y: wheelZoomClientY };
-  setZoom(zoomLevel + step, wheelZoomClientX, wheelZoomClientY);
+  setZoom(zoomLevel + step);
 }
 
 function touchDistance(a, b) {
@@ -2188,8 +2171,6 @@ if (boardViewport instanceof HTMLElement) {
       event.stopPropagation();
       const step = wheelZoomStep(event);
       if (step === 0) return;
-      wheelZoomClientX = event.clientX;
-      wheelZoomClientY = event.clientY;
       wheelZoomAccum += step;
       if (wheelZoomRaf == null) {
         wheelZoomRaf = requestAnimationFrame(flushWheelZoomFrame);
@@ -2198,21 +2179,6 @@ if (boardViewport instanceof HTMLElement) {
     { passive: false }
   );
 
-  boardViewport.addEventListener("pointermove", (event) => {
-    const r = boardViewport.getBoundingClientRect();
-    const il = r.left + boardViewport.clientLeft;
-    const it = r.top + boardViewport.clientTop;
-    const iw = boardViewport.clientWidth;
-    const ih = boardViewport.clientHeight;
-    if (
-      event.clientX >= il &&
-      event.clientX < il + iw &&
-      event.clientY >= it &&
-      event.clientY < it + ih
-    ) {
-      boardZoomAnchorClient = { x: event.clientX, y: event.clientY };
-    }
-  });
   boardViewport.addEventListener(
     "touchend",
     (event) => {
@@ -2624,9 +2590,5 @@ if (launchGate instanceof HTMLElement) {
 }
 
 window.addEventListener("resize", () => {
-  if (boardZoomAnchorClient) {
-    setZoom(zoomLevel, boardZoomAnchorClient.x, boardZoomAnchorClient.y);
-  } else {
-    setZoom(zoomLevel);
-  }
+  setZoom(zoomLevel);
 });
