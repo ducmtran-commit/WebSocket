@@ -81,6 +81,8 @@ Optional configuration values:
 - `PORT=3000`
 - `NODE_ENV=production`
 - `NODE_VERSION=18`
+- `BOARD_DATA_DIR=./data`  
+  Directory used for room snapshot files (set to persistent storage path in production)
 - `MAX_ROOMS=5`
 - `MAX_USERS_PER_ROOM=30`
 - `MAX_UNDO_ACTIONS=240`  
@@ -105,6 +107,8 @@ Optional configuration values:
 3. Select your repository
 4. Render reads `render.yaml` and provisions the service
 5. Open deployed URL and test with multiple clients
+
+Important: room snapshots are filesystem-based. In production, use persistent storage (or a database) and set `BOARD_DATA_DIR` to that persistent mount path so room state survives service restarts.
 
 ### Option B: Manual Web Service
 
