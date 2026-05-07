@@ -896,6 +896,38 @@ function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
   boardViewport.scrollTop = clamp(nextScrollTop, 0, maxTop);
 }
 
+function applyZoomKeepingLocalPoint(nextZoom, localX, localY, anchorClientX, anchorClientY) {
+  const minZoom = getEffectiveMinZoom();
+  const maxZoom = getEffectiveMaxZoom();
+  const clamped = Math.min(maxZoom, Math.max(minZoom, Number(nextZoom)));
+  if (!Number.isFinite(clamped)) return;
+  const viewportRect = boardViewport.getBoundingClientRect();
+  const innerLeft = viewportRect.left + boardViewport.clientLeft;
+  const innerTop = viewportRect.top + boardViewport.clientTop;
+  const viewW = boardViewport.clientWidth;
+  const viewH = boardViewport.clientHeight;
+  const pivotX = clamp(anchorClientX, innerLeft, innerLeft + Math.max(0, viewW - 1e-6));
+  const pivotY = clamp(anchorClientY, innerTop, innerTop + Math.max(0, viewH - 1e-6));
+  const pivotRelX = pivotX - innerLeft;
+  const pivotRelY = pivotY - innerTop;
+
+  zoomInput.min = String(minZoom);
+  zoomInput.max = String(maxZoom);
+  zoomLevel = clamped;
+  zoomInput.value = String(clamped);
+  updateZoomSliderVisual();
+  zoomText.textContent = `Zoom: ${Math.round(clamped * 100)}%`;
+  board.style.transform = `scale(${zoomLevel})`;
+  void board.offsetWidth;
+
+  const nextScrollLeft = localX * clamped - pivotRelX;
+  const nextScrollTop = localY * clamped - pivotRelY;
+  const maxLeft = Math.max(0, boardViewport.scrollWidth - boardViewport.clientWidth);
+  const maxTop = Math.max(0, boardViewport.scrollHeight - boardViewport.clientHeight);
+  boardViewport.scrollLeft = clamp(nextScrollLeft, 0, maxLeft);
+  boardViewport.scrollTop = clamp(nextScrollTop, 0, maxTop);
+}
+
 function shouldStartPanning(event) {
   const isMiddleOrRight = event.button === 1 || event.button === 2;
   const isSpaceAndLeft = isSpaceHeld && event.button === 0;
@@ -2048,10 +2080,19 @@ if (boardViewport instanceof HTMLElement) {
       if (fingers === 2) {
         const a = event.touches[0];
         const b = event.touches[1];
+        const centerX = (a.clientX + b.clientX) / 2;
+        const centerY = (a.clientY + b.clientY) / 2;
+        const vr = boardViewport.getBoundingClientRect();
+        const innerLeft = vr.left + boardViewport.clientLeft;
+        const innerTop = vr.top + boardViewport.clientTop;
+        const pivotRelX = centerX - innerLeft;
+        const pivotRelY = centerY - innerTop;
         touchPinchState = {
           startDistance: Math.max(1, touchDistance(a, b)),
           startZoom: zoomLevel,
           moved: false,
+          localX: (boardViewport.scrollLeft + pivotRelX) / Math.max(1e-6, zoomLevel),
+          localY: (boardViewport.scrollTop + pivotRelY) / Math.max(1e-6, zoomLevel),
         };
       }
       if (fingers !== 2 && fingers !== 3) {
@@ -2097,7 +2138,13 @@ if (boardViewport instanceof HTMLElement) {
         }
         const centerX = (a.clientX + b.clientX) / 2;
         const centerY = (a.clientY + b.clientY) / 2;
-        setZoom(touchPinchState.startZoom * ratio, centerX, centerY);
+        applyZoomKeepingLocalPoint(
+          touchPinchState.startZoom * ratio,
+          touchPinchState.localX,
+          touchPinchState.localY,
+          centerX,
+          centerY
+        );
         event.preventDefault();
       }
       if (!multiFingerTapCandidate || event.touches.length !== multiFingerTapCandidate.fingers) return;
