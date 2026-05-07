@@ -1952,6 +1952,10 @@ function stopPainting() {
 }
 
 board.addEventListener("mousedown", (event) => {
+  if (event.sourceCapabilities?.firesTouchEvents) {
+    // Ignore compatibility mouse events generated from touch.
+    return;
+  }
   if (shouldStartPanning(event)) {
     event.preventDefault();
     startPanning(event);
@@ -1968,12 +1972,25 @@ board.addEventListener("pointerdown", (event) => {
   if (event.pointerType === "pen") {
     lastPenUseAt = performance.now();
   } else if (multiFingerTapCandidate) {
+    if (event.pointerType === "touch") {
+      event.preventDefault();
+    }
     return;
   }
   if (event.pointerType === "touch") {
-    if (activeBoardTouchCount > 1) return;
-    if (performance.now() < blockTouchPaintUntil) return;
-    if (shouldUseFingerPanMode()) return;
+    if (activeBoardTouchCount > 1) {
+      event.preventDefault();
+      return;
+    }
+    if (performance.now() < blockTouchPaintUntil) {
+      event.preventDefault();
+      return;
+    }
+    if (shouldUseFingerPanMode()) {
+      // In Pencil Mode, finger is for pan/zoom only, never paint.
+      event.preventDefault();
+      return;
+    }
   }
   event.preventDefault();
   if (board.setPointerCapture) {
