@@ -11,8 +11,8 @@ const PORT = process.env.PORT || 3000;
 
 const DATA_DIR = path.join(__dirname, "data");
 const ROOMS_DIR = path.join(DATA_DIR, "rooms");
-const RETENTION_MS = Math.max(1, Number(process.env.BOARD_RETENTION_HOURS || 48)) * 60 * 60 * 1000;
-const PUBLIC_IDLE_WIPE_MS = Math.max(1, Number(process.env.BOARD_IDLE_WIPE_MINUTES || 4320)) * 60 * 1000;
+const RETENTION_MS = Math.max(72, Number(process.env.BOARD_RETENTION_HOURS || 72)) * 60 * 60 * 1000;
+const PUBLIC_IDLE_WIPE_MS = Math.max(4320, Number(process.env.BOARD_IDLE_WIPE_MINUTES || 4320)) * 60 * 1000;
 const PRIVATE_IDLE_DELETE_MS = Math.max(1, Number(process.env.PRIVATE_ROOM_IDLE_DELETE_MINUTES || 60)) * 60 * 1000;
 const SAVE_DEBOUNCE_MS = Math.max(3000, Number(process.env.BOARD_SAVE_DEBOUNCE_MS || 12000));
 const PAINT_BROADCAST_MERGE_MS = Math.max(4, Number(process.env.PAINT_BROADCAST_MERGE_MS || 8));
