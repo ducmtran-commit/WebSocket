@@ -644,6 +644,23 @@ function shouldHandleCanvasShortcut(event) {
   return tag !== "INPUT" && tag !== "TEXTAREA" && !target.isContentEditable;
 }
 
+function isTextEntryTarget(target) {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  if (target.tagName === "TEXTAREA") return true;
+  if (target.tagName !== "INPUT") return false;
+  const type = String(target.getAttribute("type") || "text").toLowerCase();
+  return (
+    type === "text" ||
+    type === "search" ||
+    type === "email" ||
+    type === "url" ||
+    type === "tel" ||
+    type === "password" ||
+    type === "number"
+  );
+}
+
 function openColorPicker() {
   if (!(colorInput instanceof HTMLInputElement)) return;
   colorPickerOpen = true;
@@ -2353,6 +2370,17 @@ if (shortcutHelpOverlay instanceof HTMLElement) {
 
 window.addEventListener("keydown", (event) => {
   if (!hasEnteredBoard) return;
+  const textEntryFocused = isTextEntryTarget(event.target);
+  if (
+    event.code === "Space" &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey &&
+    !textEntryFocused
+  ) {
+    isSpaceHeld = true;
+    event.preventDefault();
+  }
   if (!event.ctrlKey && !event.metaKey && !event.altKey && event.code === "Backquote") {
     event.preventDefault();
     setShortcutHelpOpen(!isShortcutHelpOpen());
@@ -2380,10 +2408,6 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault();
     toggleWorkspaceHidden();
     return;
-  }
-  if (event.code === "Space" && canUseCanvasShortcut) {
-    isSpaceHeld = true;
-    event.preventDefault();
   }
   if (!canUseCanvasShortcut) return;
   const key = event.key.toLowerCase();
