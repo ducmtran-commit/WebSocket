@@ -709,9 +709,7 @@ function loadPencilModeSetting() {
 
 function shouldHandleCanvasShortcut(event) {
   const target = event.target;
-  if (!(target instanceof HTMLElement)) return true;
-  const tag = target.tagName;
-  return tag !== "INPUT" && tag !== "TEXTAREA" && !target.isContentEditable;
+  return !isTextEntryTarget(target);
 }
 
 function isTextEntryTarget(target) {
