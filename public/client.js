@@ -1196,8 +1196,14 @@ const TWO_FINGER_TAP_MAX_MS = 380;
 const TWO_FINGER_TAP_MAX_MOVE_PX = 36;
 const TWO_FINGER_PAN_CANCEL_PX = 14;
 const TWO_FINGER_DOUBLE_TAP_MS = 650;
+const TWO_FINGER_HOLD_UNDO_DELAY_MS = 240;
+const TWO_FINGER_HOLD_UNDO_INTERVAL_MS = 120;
 const THREE_FINGER_DOUBLE_TAP_MS = 650;
 const ZOOM_EDGE_GUARD_PX = 10;
+let twoFingerHoldUndoDelayTimer = null;
+let twoFingerHoldUndoInterval = null;
+let twoFingerHoldUndoArmed = false;
+let twoFingerHoldUndoTriggered = false;
 
 function isMobileWorkspaceDockMode() {
   return window.matchMedia("(max-width: 700px)").matches;
@@ -2249,6 +2255,48 @@ function touchDistance(a, b) {
   return Math.hypot(dx, dy);
 }
 
+function performUndoGestureStep() {
+  flushPaintBatch();
+  send({ type: "undo" });
+}
+
+function stopTwoFingerHoldUndo() {
+  if (twoFingerHoldUndoDelayTimer != null) {
+    window.clearTimeout(twoFingerHoldUndoDelayTimer);
+    twoFingerHoldUndoDelayTimer = null;
+  }
+  if (twoFingerHoldUndoInterval != null) {
+    window.clearInterval(twoFingerHoldUndoInterval);
+    twoFingerHoldUndoInterval = null;
+  }
+  twoFingerHoldUndoArmed = false;
+  twoFingerHoldUndoTriggered = false;
+}
+
+function armTwoFingerHoldUndoIfEligible() {
+  if (performance.now() - lastTwoFingerTapAt > TWO_FINGER_DOUBLE_TAP_MS) {
+    stopTwoFingerHoldUndo();
+    return;
+  }
+  stopTwoFingerHoldUndo();
+  twoFingerHoldUndoArmed = true;
+  twoFingerHoldUndoDelayTimer = window.setTimeout(() => {
+    twoFingerHoldUndoDelayTimer = null;
+    if (!twoFingerHoldUndoArmed) return;
+    if (activeBoardTouchCount !== 2) return;
+    if (touchPinchState?.moved) return;
+    twoFingerHoldUndoTriggered = true;
+    performUndoGestureStep();
+    twoFingerHoldUndoInterval = window.setInterval(() => {
+      if (!twoFingerHoldUndoArmed || activeBoardTouchCount !== 2) {
+        stopTwoFingerHoldUndo();
+        return;
+      }
+      performUndoGestureStep();
+    }, TWO_FINGER_HOLD_UNDO_INTERVAL_MS);
+  }, TWO_FINGER_HOLD_UNDO_DELAY_MS);
+}
+
 function touchesContainStylus(touches) {
   if (!touches) return false;
   for (const t of touches) {
@@ -2268,6 +2316,11 @@ if (boardViewport instanceof HTMLElement) {
       }
       const fingers = event.touches.length;
       activeBoardTouchCount = fingers;
+      if (fingers === 2) {
+        armTwoFingerHoldUndoIfEligible();
+      } else {
+        stopTwoFingerHoldUndo();
+      }
       touchPinchState = null;
       if (fingers === 1 && shouldUseFingerPanMode()) {
         const t = event.touches[0];
@@ -2323,6 +2376,9 @@ if (boardViewport instanceof HTMLElement) {
         return;
       }
       activeBoardTouchCount = event.touches.length;
+      if (event.touches.length !== 2) {
+        stopTwoFingerHoldUndo();
+      }
       if (touchPanState && event.touches.length === 1) {
         const t = event.touches[0];
         const dx = t.clientX - touchPanState.x;
@@ -2339,6 +2395,7 @@ if (boardViewport instanceof HTMLElement) {
         const ratio = nextDistance / touchPinchState.startDistance;
         if (Math.abs(ratio - 1) > 0.02) {
           touchPinchState.moved = true;
+          stopTwoFingerHoldUndo();
         }
         const centerX = (a.clientX + b.clientX) / 2;
         const centerY = (a.clientY + b.clientY) / 2;
@@ -2367,6 +2424,7 @@ if (boardViewport instanceof HTMLElement) {
         multiFingerTapCandidate.fingers === 2 ? TWO_FINGER_PAN_CANCEL_PX : TWO_FINGER_TAP_MAX_MOVE_PX;
       if (moveSq > cancelPx * cancelPx) {
         multiFingerTapCandidate = null;
+        stopTwoFingerHoldUndo();
       }
     },
     { passive: false }
@@ -2398,6 +2456,9 @@ if (boardViewport instanceof HTMLElement) {
         return;
       }
       activeBoardTouchCount = event.touches.length;
+      if (event.touches.length !== 2) {
+        stopTwoFingerHoldUndo();
+      }
       if (event.touches.length <= 1) {
         touchPinchState = null;
       }
@@ -2423,10 +2484,13 @@ if (boardViewport instanceof HTMLElement) {
         if (now - lastTwoFingerTapAt <= TWO_FINGER_DOUBLE_TAP_MS) {
           event.preventDefault();
           lastTwoFingerTapAt = 0;
-          flushPaintBatch();
-          send({ type: "undo" });
+          if (!twoFingerHoldUndoTriggered) {
+            performUndoGestureStep();
+          }
+          stopTwoFingerHoldUndo();
           return;
         }
+        stopTwoFingerHoldUndo();
         lastTwoFingerTapAt = now;
         return;
       }
@@ -2447,6 +2511,7 @@ if (boardViewport instanceof HTMLElement) {
     "touchcancel",
     () => {
       activeBoardTouchCount = 0;
+      stopTwoFingerHoldUndo();
       touchPanState = null;
       touchPinchState = null;
       multiFingerTapCandidate = null;
