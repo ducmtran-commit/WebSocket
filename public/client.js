@@ -857,18 +857,23 @@ function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
     typeof anchorClientY === "number" &&
     Number.isFinite(anchorClientY);
 
-  const pivotX = hasAnchor
+  const beforeRect = board.getBoundingClientRect();
+  let pivotX = hasAnchor
     ? clamp(anchorClientX, innerLeft, Math.max(innerLeft, innerRight - 1e-6))
     : innerLeft + viewW / 2;
-  const pivotY = hasAnchor
+  let pivotY = hasAnchor
     ? clamp(anchorClientY, innerTop, Math.max(innerTop, innerBottom - 1e-6))
     : innerTop + viewH / 2;
-
-  const beforeRect = board.getBoundingClientRect();
+  // Keep zoom anchor within board bounds to avoid high-zoom jumps
+  // when the cursor is near/outside the rendered board area.
+  if (hasAnchor) {
+    pivotX = clamp(pivotX, beforeRect.left, Math.max(beforeRect.left, beforeRect.right - 1e-6));
+    pivotY = clamp(pivotY, beforeRect.top, Math.max(beforeRect.top, beforeRect.bottom - 1e-6));
+  }
   const beforeW = Math.max(1e-6, beforeRect.width);
   const beforeH = Math.max(1e-6, beforeRect.height);
-  const u = (pivotX - beforeRect.left) / beforeW;
-  const v = (pivotY - beforeRect.top) / beforeH;
+  const u = clamp((pivotX - beforeRect.left) / beforeW, 0, 1);
+  const v = clamp((pivotY - beforeRect.top) / beforeH, 0, 1);
 
   zoomLevel = clamped;
   zoomInput.value = String(clamped);
