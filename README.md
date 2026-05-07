@@ -29,6 +29,14 @@ Multiple users can join the same room, draw on a shared board in real time, chat
 - Fast drag painting with line interpolation between pointer points
 - Zoom controls: buttons, slider, and `Ctrl/Cmd + mouse wheel`
 - Pan canvas using middle/right mouse or hold `Space` + left drag
+- Mobile/tablet gestures:
+  - 2-finger pinch to zoom
+  - 2-finger double tap to undo
+  - hold after 2-finger double tap for continuous undo
+  - 3-finger double tap to redo
+- Pencil Mode behavior:
+  - when ON, finger touch is pan/zoom only
+  - only stylus/pen input draws
 - Keyboard shortcuts:
   - `E` toggle eraser
   - `Ctrl/Cmd + Z` undo
@@ -47,8 +55,15 @@ Multiple users can join the same room, draw on a shared board in real time, chat
 
 - Room state is saved to disk (`data/rooms/*.json`)
 - Saved room data expires after retention window
-- Public room board wipes after idle timeout
+- `LOBBY` retention floor is 72h
+- `LOBBY` public idle wipe floor is 72h (`4320` minutes)
 - Private rooms are deleted after idle timeout (default 1 hour)
+
+### Launch and Session Resume
+
+- New users (no valid saved session) see the launch screen first
+- Returning users with an active board session resume directly into the board
+- Returning resume skips the entrance dissolve animation for a faster refresh flow
 
 ## Run Locally
 
@@ -68,10 +83,12 @@ Optional configuration values:
 - `NODE_VERSION=18`
 - `MAX_ROOMS=5`
 - `MAX_USERS_PER_ROOM=30`
-- `BOARD_RETENTION_HOURS=48`  
+- `MAX_UNDO_ACTIONS=240`  
+  Per-user undo/redo action history cap
+- `BOARD_RETENTION_HOURS=72`  
   Keep saved room state for this long since last activity
 - `BOARD_IDLE_WIPE_MINUTES=4320`  
-  Public room idle timeout (wipe board only)
+  Public room idle timeout (wipe board only, floor is 4320)
 - `PRIVATE_ROOM_IDLE_DELETE_MINUTES=60`  
   Private room idle timeout (delete room state)
 - `BOARD_SAVE_DEBOUNCE_MS=12000`  
