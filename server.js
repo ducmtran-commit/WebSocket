@@ -21,7 +21,7 @@ const ROOMS_DIR = path.join(DATA_DIR, "rooms");
 const RETENTION_MS = Math.max(72, readEnvNumber("BOARD_RETENTION_HOURS", 72)) * 60 * 60 * 1000;
 const PUBLIC_IDLE_WIPE_MS = Math.max(4320, readEnvNumber("BOARD_IDLE_WIPE_MINUTES", 4320)) * 60 * 1000;
 const PRIVATE_IDLE_DELETE_MS =
-  Math.max(1, readEnvNumber("PRIVATE_ROOM_IDLE_DELETE_MINUTES", 60)) * 60 * 1000;
+  Math.max(5, readEnvNumber("PRIVATE_ROOM_IDLE_DELETE_MINUTES", 5)) * 60 * 1000;
 const SAVE_DEBOUNCE_MS = Math.max(3000, Number(process.env.BOARD_SAVE_DEBOUNCE_MS || 12000));
 const PAINT_BROADCAST_MERGE_MS = Math.max(4, Number(process.env.PAINT_BROADCAST_MERGE_MS || 8));
 const MAX_ROOMS = Math.max(1, Number(process.env.MAX_ROOMS || 5));
