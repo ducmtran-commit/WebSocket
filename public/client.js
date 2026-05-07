@@ -1941,6 +1941,15 @@ boardViewport.addEventListener("mousedown", (event) => {
 });
 
 window.addEventListener("mousemove", (event) => {
+  if (!isPanning && isSpaceHeld && (event.buttons & 1) === 1 && clientIsOverBoardViewport(event.clientX, event.clientY)) {
+    startPanning(event);
+  }
+
+  if (isPanning && event.buttons === 0) {
+    isPanning = false;
+    boardViewport.classList.remove("is-panning");
+  }
+
   if (isPainting && (event.buttons & 1) !== 1) {
     stopPainting();
   } else if (
