@@ -18,6 +18,7 @@ const SAVE_DEBOUNCE_MS = Math.max(3000, Number(process.env.BOARD_SAVE_DEBOUNCE_M
 const PAINT_BROADCAST_MERGE_MS = Math.max(4, Number(process.env.PAINT_BROADCAST_MERGE_MS || 8));
 const MAX_ROOMS = Math.max(1, Number(process.env.MAX_ROOMS || 5));
 const MAX_USERS_PER_ROOM = Math.max(1, Number(process.env.MAX_USERS_PER_ROOM || 30));
+const MAX_UNDO_ACTIONS = Math.max(40, Number(process.env.MAX_UNDO_ACTIONS || 240));
 const PUBLIC_ROOM_ID = "lobby";
 
 const GRID_WIDTH = 256;
@@ -726,7 +727,7 @@ wss.on("connection", (ws, req) => {
           broadcastDrawingActivity(currentRoom.id, current, updates[updates.length - 1]);
         }
         ws.undoStack.push({ changes });
-        if (ws.undoStack.length > 80) ws.undoStack.shift();
+        if (ws.undoStack.length > MAX_UNDO_ACTIONS) ws.undoStack.shift();
         ws.redoStack = [];
         touchRoomActivity(currentRoom);
       }
@@ -744,7 +745,7 @@ wss.on("connection", (ws, req) => {
       }
       broadcastPixelsUpdated(currentRoom.id, updates);
       ws.redoStack.push(action);
-      if (ws.redoStack.length > 80) ws.redoStack.shift();
+      if (ws.redoStack.length > MAX_UNDO_ACTIONS) ws.redoStack.shift();
       touchRoomActivity(currentRoom);
       return;
     }
@@ -760,7 +761,7 @@ wss.on("connection", (ws, req) => {
       }
       broadcastPixelsUpdated(currentRoom.id, updates);
       ws.undoStack.push(action);
-      if (ws.undoStack.length > 80) ws.undoStack.shift();
+      if (ws.undoStack.length > MAX_UNDO_ACTIONS) ws.undoStack.shift();
       touchRoomActivity(currentRoom);
       return;
     }
