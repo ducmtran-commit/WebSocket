@@ -104,6 +104,17 @@ body.app-gated.entering-canvas .layout {
 .launch-gate.workspace-modal {
   background: rgba(3, 5, 9, 0.68);
   backdrop-filter: blur(2px);
+  opacity: 1;
+  transition: opacity 150ms ease;
+}
+
+.launch-gate.workspace-modal.workspace-modal-opening,
+.launch-gate.workspace-modal.workspace-modal-closing {
+  opacity: 0;
+}
+
+.launch-gate.workspace-modal.workspace-modal-closing {
+  pointer-events: none;
 }
 
 .launch-gate.workspace-modal::before {
