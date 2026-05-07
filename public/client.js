@@ -985,6 +985,8 @@ function setZoom(nextZoom, anchorClientX = null, anchorClientY = null) {
   updateZoomSliderVisual();
   zoomText.textContent = `Zoom: ${Math.round(clamped * 100)}%`;
   board.style.transform = `scale(${zoomLevel})`;
+  // Keep scroll metrics in sync after transform updates.
+  void board.offsetWidth;
 
   const nextScrollLeft = localX * clamped - pivotRelX;
   const nextScrollTop = localY * clamped - pivotRelY;
@@ -1016,6 +1018,8 @@ function applyZoomKeepingLocalPoint(nextZoom, localX, localY, anchorClientX, anc
   updateZoomSliderVisual();
   zoomText.textContent = `Zoom: ${Math.round(clamped * 100)}%`;
   board.style.transform = `scale(${zoomLevel})`;
+  // Keep scroll metrics in sync after transform updates.
+  void board.offsetWidth;
 
   const nextScrollLeft = localX * clamped - pivotRelX;
   const nextScrollTop = localY * clamped - pivotRelY;
@@ -1923,7 +1927,11 @@ function stopPainting() {
 }
 
 board.addEventListener("mousedown", (event) => {
-  if (shouldStartPanning(event)) return;
+  if (shouldStartPanning(event)) {
+    event.preventDefault();
+    startPanning(event);
+    return;
+  }
   if (event.button !== 0) return;
   event.preventDefault();
   beginPainting(event.clientX, event.clientY, null, "mouse");
