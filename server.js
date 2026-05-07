@@ -827,6 +827,15 @@ wss.on("connection", (ws, req) => {
       broadcastUsers(currentRoom.id);
       broadcastChat(currentRoom.id);
     }
+    // Persist immediately when a room becomes empty so recent drawing isn't
+    // lost if the process restarts before the normal debounce flush runs.
+    if (currentRoom.users.size === 0 && currentRoom.boardDirty) {
+      if (currentRoom.saveDebounceTimer) {
+        clearTimeout(currentRoom.saveDebounceTimer);
+        currentRoom.saveDebounceTimer = null;
+      }
+      void flushRoomSave(currentRoom.id);
+    }
     scheduleIdleWipeIfEmpty(currentRoom.id);
   });
 });
