@@ -120,6 +120,13 @@ function countOpenClientsInRoom(roomId) {
   return n;
 }
 
+function roomHasConnectedUsers(room) {
+  if (!room || !(room.users instanceof Map)) return false;
+  if (room.users.size > 0) return true;
+  // Fallback for edge races while ws state catches up.
+  return countOpenClientsInRoom(room.id) > 0;
+}
+
 function cancelIdleWipe(room) {
   if (room.idleWipeTimer) {
     clearTimeout(room.idleWipeTimer);
@@ -137,7 +144,7 @@ function performIdleWipe(roomId) {
   const room = rooms.get(roomId);
   if (!room) return;
   room.idleWipeTimer = null;
-  if (countOpenClientsInRoom(roomId) > 0) return;
+  if (roomHasConnectedUsers(room)) return;
   if (room.isPublic) {
     resetRoomToEmpty(room);
     room.lastActivityAt = Date.now();
@@ -162,7 +169,7 @@ function performIdleWipe(roomId) {
 function scheduleIdleWipeIfEmpty(roomId) {
   const room = rooms.get(roomId);
   if (!room) return;
-  if (countOpenClientsInRoom(roomId) > 0) return;
+  if (roomHasConnectedUsers(room)) return;
   cancelIdleWipe(room);
   const idleMs = room.isPublic ? PUBLIC_IDLE_WIPE_MS : PRIVATE_IDLE_DELETE_MS;
   room.idleWipeTimer = setTimeout(() => {
