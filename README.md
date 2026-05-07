@@ -89,7 +89,7 @@ Optional configuration values:
   Keep saved room state for this long since last activity
 - `BOARD_IDLE_WIPE_MINUTES=4320`  
   Public room idle timeout (wipe board only, floor is 4320)
-- `PRIVATE_ROOM_IDLE_DELETE_MINUTES=60`  
+- `PRIVATE_ROOM_IDLE_DELETE_MINUTES=5`  
   Private room idle timeout (delete room state)
 - `BOARD_SAVE_DEBOUNCE_MS=12000`  
   Delay before persisting room changes
